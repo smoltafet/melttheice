@@ -27,10 +27,24 @@ if (!getApps().length) {
 export const db: Firestore = getFirestore(app);
 
 // Initialize Analytics (only in browser)
+// Initialize Analytics (only in browser)
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+
 let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
   analytics = getAnalytics(app);
 }
+
+// Initialize Storage
+export const storage: FirebaseStorage = getStorage(app);
+
+// Initialize Auth
+import { getAuth, Auth } from 'firebase/auth';
+export const auth: Auth = getAuth(app);
+
+// Initialize Messaging
+import { getMessaging, Messaging } from 'firebase/messaging';
+export const messaging: Messaging | null = typeof window !== 'undefined' ? getMessaging(app) : null;
 
 export { analytics };
 export default app;
