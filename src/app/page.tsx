@@ -5,17 +5,23 @@ import { collection, addDoc, onSnapshot, query, orderBy, Timestamp } from 'fireb
 import { db } from '@/lib/firebase';
 import { IceSighting, ReportFormData } from '@/lib/types';
 import { isExpired } from '@/lib/utils';
+import { Sidebar } from '@/components/UI/Sidebar';
 import MapView from '@/components/Map/MapView';
-import MenuSidebar from '@/components/Sidebar/MenuSidebar';
-import SightingsSidebar from '@/components/Sidebar/SightingsSidebar';
 import ReportButton from '@/components/Report/ReportButton';
 import ReportSheet from '@/components/Report/ReportSheet';
-import SightingDetailSheet from '@/components/Details/SightingDetailSheet';
 
 export default function HomePage() {
   const [sightings, setSightings] = useState<IceSighting[]>([]);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [selectedSighting, setSelectedSighting] = useState<IceSighting | null>(null);
+
+  const handleSightingSelect = useCallback((sighting: IceSighting) => {
+    setSelectedSighting(sighting);
+  }, []);
+
+  const handleBackToMap = useCallback(() => {
+    setSelectedSighting(null);
+  }, []);
 
   // Subscribe to real-time sightings from Firebase
   useEffect(() => {
@@ -85,41 +91,34 @@ export default function HomePage() {
     }
   }, []);
 
-  // Handle sidebar sighting click - would center map on sighting
-  const handleSightingClick = useCallback((sighting: IceSighting) => {
-    setSelectedSighting(sighting);
-    // TODO: Center map on sighting
-  }, []);
-
-  // Handle map marker click
-  const handleMarkerClick = useCallback((sighting: IceSighting) => {
-    setSelectedSighting(sighting);
-  }, []);
-
   return (
     <main className="relative w-screen h-screen overflow-hidden">
-      {/* Mapbox Background - z-0 so overlay UI sits on top */}
-      <MapView sightings={sightings} onMarkerClick={handleMarkerClick} />
+      <Sidebar 
+        sightings={sightings} 
+        onSightingClick={handleSightingSelect}
+        selectedSighting={selectedSighting}
+        onBack={handleBackToMap}
+      >
+        {/* Mapbox Background */}
+        <div className="absolute inset-0 z-0">
+          <MapView 
+            sightings={sightings} 
+            onMarkerClick={handleSightingSelect}
+            selectedSighting={selectedSighting}
+          />
+        </div>
 
-      {/* Overlay layer: all UI on top of map (Google Maps style). pointer-events-none
-          on container lets map receive clicks; overlay elements use default pointer-events. */}
-      <div className="fixed inset-0 z-[9999] pointer-events-none [&>*]:pointer-events-auto">
-        <MenuSidebar />
-        <SightingsSidebar
-          sightings={sightings}
-          onSightingClick={handleSightingClick}
-        />
-        <ReportButton onClick={() => setIsReportSheetOpen(true)} />
-        <ReportSheet
-          isOpen={isReportSheetOpen}
-          onClose={() => setIsReportSheetOpen(false)}
-          onSubmit={handleReportSubmit}
-        />
-        <SightingDetailSheet
-          sighting={selectedSighting}
-          onClose={() => setSelectedSighting(null)}
-        />
-      </div>
+        {/* Overlay layer: UI elements on top of map */}
+        <div className="absolute inset-0 z-[101] pointer-events-none [&>*]:pointer-events-auto">
+          <ReportButton onClick={() => setIsReportSheetOpen(true)} />
+          <ReportSheet
+            isOpen={isReportSheetOpen}
+            onClose={() => setIsReportSheetOpen(false)}
+            onSubmit={handleReportSubmit}
+          />
+        </div>
+      </Sidebar>
     </main>
   );
 }
+

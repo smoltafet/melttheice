@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X, MapPin, ArrowRight, Car, Users, Activity, AlertTriangle } from 'lucide-react';
 import { ReportFormData } from '@/lib/types';
 import { getCurrentLocation } from '@/lib/utils';
-import GlassmorphicCard from '../UI/GlassmorphicCard';
 
 interface ReportSheetProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ interface ReportSheetProps {
 export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetProps) {
   const [formData, setFormData] = useState<ReportFormData>({
     vehicleType: 'Van',
-    vehicleColor: '#FFFFFF',
+    vehicleColor: '',
     personnelCount: 1,
     personnelDescription: '',
     activity: 'Patrolling',
@@ -23,7 +23,6 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
   });
   const [loadingLocation, setLoadingLocation] = useState(false);
 
-  // Auto-get location when sheet opens
   useEffect(() => {
     if (isOpen && !formData.location) {
       setLoadingLocation(true);
@@ -33,7 +32,6 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
         })
         .catch((error) => {
           console.error('Error getting location:', error);
-          alert('Please enable location services to report a sighting');
         })
         .finally(() => {
           setLoadingLocation(false);
@@ -49,16 +47,29 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
     }
     onSubmit(formData);
     onClose();
-    // Reset form
     setFormData({
       vehicleType: 'Van',
-      vehicleColor: '#FFFFFF',
+      vehicleColor: '',
       personnelCount: 1,
       personnelDescription: '',
       activity: 'Patrolling',
       itemsHeld: '',
     });
   };
+
+  const vehicleTypes = [
+    { value: 'Van', label: 'Van', icon: '🚐' },
+    { value: 'SUV', label: 'SUV', icon: '🚙' },
+    { value: 'Sedan', label: 'Sedan', icon: '🚗' },
+    { value: 'Unmarked', label: 'Unmarked', icon: '🚘' },
+  ];
+
+  const activities = [
+    { value: 'Patrolling', label: 'Patrolling' },
+    { value: 'Processing', label: 'Processing' },
+    { value: 'Stationary', label: 'Stationary' },
+    { value: 'Other', label: 'Other' },
+  ];
 
   return (
     <AnimatePresence>
@@ -69,163 +80,186 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-40"
+            className="fixed inset-0 bg-black/70 z-[100] backdrop-blur-md"
             onClick={onClose}
           />
 
-          {/* Sheet */}
+          {/* Modal */}
           <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+            className="fixed inset-0 z-[101] flex items-center justify-center p-6 pointer-events-none"
           >
-            <GlassmorphicCard className="rounded-t-3xl rounded-b-none p-6 max-w-2xl mx-auto">
-              {/* Handle bar */}
-              <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6" />
+            <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl pointer-events-auto overflow-hidden">
+              {/* Header with gradient */}
+              <div className="bg-gradient-to-r from-red-600 to-red-500 px-8 py-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                      <AlertTriangle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Report ICE Sighting</h2>
+                      <p className="text-white/80 text-sm mt-0.5">Help keep your community informed</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={onClose}
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
+                  >
+                    <X className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+              </div>
 
-              <h2 className="text-2xl font-bold mb-6">Report ICE Sighting</h2>
-
-              <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto max-h-[calc(85vh-8rem)] custom-scrollbar pr-2">
-                {/* Vehicle Section */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-white/90">Vehicle Information</h3>
+              {/* Form Content */}
+              <div className="px-12 py-10 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <form onSubmit={handleSubmit} className="space-y-10">
                   
+                  {/* Vehicle Type Selection */}
                   <div>
-                    <label className="block text-sm text-white/70 mb-2">Vehicle Type</label>
-                    <select
-                      value={formData.vehicleType}
-                      onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value as any })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                               focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                      <option value="Van">Van</option>
-                      <option value="SUV">SUV</option>
-                      <option value="Sedan">Sedan</option>
-                      <option value="Unmarked">Unmarked</option>
-                    </select>
+                    <div className="flex items-center gap-3 mb-5">
+                      <Car className="w-5 h-5 text-gray-600" />
+                      <label className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Vehicle Type</label>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4">
+                      {vehicleTypes.map((type) => (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, vehicleType: type.value as any })}
+                          className={`p-4 rounded-2xl border-2 transition-all duration-200 flex flex-col items-center gap-2
+                            ${formData.vehicleType === type.value 
+                              ? 'border-red-500 bg-red-50 shadow-lg shadow-red-100' 
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                        >
+                          <span className="text-2xl">{type.icon}</span>
+                          <span className={`text-sm font-medium ${formData.vehicleType === type.value ? 'text-red-600' : 'text-gray-700'}`}>
+                            {type.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm text-white/70 mb-2">Vehicle Color</label>
-                    <div className="flex gap-3">
-                      <input
-                        type="color"
-                        value={formData.vehicleColor}
-                        onChange={(e) => setFormData({ ...formData, vehicleColor: e.target.value })}
-                        className="w-16 h-12 rounded-lg cursor-pointer bg-transparent"
-                      />
+                  {/* Vehicle Color & Personnel Count */}
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Vehicle Color</label>
                       <input
                         type="text"
                         value={formData.vehicleColor}
                         onChange={(e) => setFormData({ ...formData, vehicleColor: e.target.value })}
-                        className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                                 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="#FFFFFF"
+                        className="w-full border-2 border-gray-200 rounded-xl px-5 py-4 text-gray-900 text-lg
+                                 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100
+                                 transition-all placeholder:text-gray-400"
+                        placeholder="e.g., White, Black"
                       />
                     </div>
-                  </div>
-                </div>
 
-                {/* Personnel Section */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-white/90">Personnel Information</h3>
-                  
-                  <div>
-                    <label className="block text-sm text-white/70 mb-2">Number of People</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.personnelCount}
-                      onChange={(e) => setFormData({ ...formData, personnelCount: parseInt(e.target.value) })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                               focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
+                    <div>
+                      <div className="flex items-center gap-3 mb-4">
+                        <Users className="w-4 h-4 text-gray-600" />
+                        <label className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Personnel Count</label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, personnelCount: Math.max(1, formData.personnelCount - 1) })}
+                          className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
+                                   flex items-center justify-center text-2xl text-gray-600 transition-all"
+                        >
+                          −
+                        </button>
+                        <div className="flex-1 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
+                          <span className="text-2xl font-bold text-gray-800">{formData.personnelCount}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, personnelCount: formData.personnelCount + 1 })}
+                          className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
+                                   flex items-center justify-center text-2xl text-gray-600 transition-all"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Activity Selection */}
                   <div>
-                    <label className="block text-sm text-white/70 mb-2">Description (clothing, uniforms, etc.)</label>
+                    <div className="flex items-center gap-3 mb-5">
+                      <Activity className="w-5 h-5 text-gray-600" />
+                      <label className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Current Activity</label>
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      {activities.map((activity) => (
+                        <button
+                          key={activity.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, activity: activity.value as any })}
+                          className={`px-6 py-3 rounded-full border-2 transition-all duration-200 font-medium
+                            ${formData.activity === activity.value 
+                              ? 'border-red-500 bg-red-500 text-white shadow-lg shadow-red-200' 
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}`}
+                        >
+                          {activity.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Additional Details</label>
                     <textarea
                       value={formData.personnelDescription}
                       onChange={(e) => setFormData({ ...formData, personnelDescription: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                               focus:outline-none focus:ring-2 focus:ring-red-500 min-h-[80px]"
-                      placeholder="Dark uniforms, tactical gear..."
+                      className="w-full border-2 border-gray-200 rounded-xl px-5 py-4 text-gray-900
+                               focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100
+                               transition-all min-h-[120px] resize-none placeholder:text-gray-400"
+                      placeholder="Describe any additional details (uniforms, behavior, direction of travel...)"
                     />
                   </div>
-                </div>
 
-                {/* Behavior Section */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-white/90">Behavior & Activity</h3>
-                  
-                  <div>
-                    <label className="block text-sm text-white/70 mb-2">Activity</label>
-                    <select
-                      value={formData.activity}
-                      onChange={(e) => setFormData({ ...formData, activity: e.target.value as any })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                               focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                      <option value="Patrolling">Patrolling</option>
-                      <option value="Processing">Processing</option>
-                      <option value="Stationary">Stationary</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-white/70 mb-2">Items Held</label>
-                    <textarea
-                      value={formData.itemsHeld}
-                      onChange={(e) => setFormData({ ...formData, itemsHeld: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white
-                               focus:outline-none focus:ring-2 focus:ring-red-500 min-h-[80px]"
-                      placeholder="Radios, clipboards, weapons..."
-                    />
-                  </div>
-                </div>
-
-                {/* Location Info */}
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                    </svg>
-                    {loadingLocation ? (
-                      <span className="text-white/60">Getting your location...</span>
-                    ) : formData.location ? (
-                      <span className="text-white/60">
-                        Location: {formData.location.lat.toFixed(4)}, {formData.location.lng.toFixed(4)}
-                      </span>
-                    ) : (
-                      <span className="text-red-400">Location required</span>
+                  {/* Location Status */}
+                  <div className={`rounded-2xl p-5 flex items-center gap-4 ${formData.location ? 'bg-green-50 border-2 border-green-200' : 'bg-amber-50 border-2 border-amber-200'}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${formData.location ? 'bg-green-500' : 'bg-amber-500'}`}>
+                      <MapPin className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className={`text-xs font-semibold uppercase tracking-wide ${formData.location ? 'text-green-700' : 'text-amber-700'}`}>
+                        {loadingLocation ? 'Acquiring Location...' : formData.location ? 'Location Captured' : 'Location Required'}
+                      </div>
+                      {formData.location && (
+                        <div className="text-green-800 font-mono text-sm mt-1">
+                          {formData.location.lat.toFixed(6)}, {formData.location.lng.toFixed(6)}
+                        </div>
+                      )}
+                    </div>
+                    {loadingLocation && (
+                      <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                     )}
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-lg
-                             transition-colors duration-200 font-medium"
-                  >
-                    Cancel
-                  </button>
+                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={!formData.location || loadingLocation}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg
-                             transition-colors duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 
+                             text-white py-5 rounded-2xl transition-all duration-200 font-bold text-lg
+                             disabled:opacity-50 disabled:cursor-not-allowed 
+                             flex items-center justify-center gap-3 group
+                             shadow-xl shadow-red-200 hover:shadow-red-300"
                   >
-                    Submit Report
+                    <span>Submit Report</span>
+                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                   </button>
-                </div>
-              </form>
-            </GlassmorphicCard>
+                </form>
+              </div>
+            </div>
           </motion.div>
         </>
       )}
