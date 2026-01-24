@@ -11,7 +11,7 @@ interface SightingsSidebarProps {
 
 export default function SightingsSidebar({ sightings, onSightingClick }: SightingsSidebarProps) {
   return (
-    <div className="fixed left-4 top-4 bottom-4 w-80 z-30 flex flex-col">
+    <div className="absolute left-4 top-4 bottom-4 w-80 z-[80] flex flex-col">
       <GlassmorphicCard className="flex-1 flex flex-col p-4">
         <div className="mb-4">
           <h2 className="text-xl font-bold text-white">Recent Sightings</h2>

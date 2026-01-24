@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import { IceSighting, ReportFormData } from '@/lib/types';
 import { isExpired } from '@/lib/utils';
 import MapView from '@/components/Map/MapView';
+import MenuSidebar from '@/components/Sidebar/MenuSidebar';
 import SightingsSidebar from '@/components/Sidebar/SightingsSidebar';
 import ReportButton from '@/components/Report/ReportButton';
 import ReportSheet from '@/components/Report/ReportSheet';
@@ -97,30 +98,28 @@ export default function HomePage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden">
-      {/* Mapbox Background */}
+      {/* Mapbox Background - z-0 so overlay UI sits on top */}
       <MapView sightings={sightings} onMarkerClick={handleMarkerClick} />
 
-      {/* Sidebar */}
-      <SightingsSidebar
-        sightings={sightings}
-        onSightingClick={handleSightingClick}
-      />
-
-      {/* Report Button */}
-      <ReportButton onClick={() => setIsReportSheetOpen(true)} />
-
-      {/* Report Sheet */}
-      <ReportSheet
-        isOpen={isReportSheetOpen}
-        onClose={() => setIsReportSheetOpen(false)}
-        onSubmit={handleReportSubmit}
-      />
-
-      {/* Detail Sheet */}
-      <SightingDetailSheet
-        sighting={selectedSighting}
-        onClose={() => setSelectedSighting(null)}
-      />
+      {/* Overlay layer: all UI on top of map (Google Maps style). pointer-events-none
+          on container lets map receive clicks; overlay elements use default pointer-events. */}
+      <div className="fixed inset-0 z-[9999] pointer-events-none [&>*]:pointer-events-auto">
+        <MenuSidebar />
+        <SightingsSidebar
+          sightings={sightings}
+          onSightingClick={handleSightingClick}
+        />
+        <ReportButton onClick={() => setIsReportSheetOpen(true)} />
+        <ReportSheet
+          isOpen={isReportSheetOpen}
+          onClose={() => setIsReportSheetOpen(false)}
+          onSubmit={handleReportSubmit}
+        />
+        <SightingDetailSheet
+          sighting={selectedSighting}
+          onClose={() => setSelectedSighting(null)}
+        />
+      </div>
     </main>
   );
 }

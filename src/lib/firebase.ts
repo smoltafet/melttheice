@@ -5,14 +5,14 @@ import { getAnalytics, Analytics } from 'firebase/analytics';
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBMMtABaD6LKq77FOCtaEU94a6wLyh813w",
-  authDomain: "melttheice-916f0.firebaseapp.com",
-  databaseURL: "https://melttheice-916f0-default-rtdb.firebaseio.com",
-  projectId: "melttheice-916f0",
-  storageBucket: "melttheice-916f0.firebasestorage.app",
-  messagingSenderId: "1018729790888",
-  appId: "1:1018729790888:web:977a9e81a63b4b8a38b19d",
-  measurementId: "G-87G46WJ3K7"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase

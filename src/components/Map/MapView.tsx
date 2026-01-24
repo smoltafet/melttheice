@@ -94,7 +94,7 @@ export default function MapView({ sightings, onMarkerClick }: MapViewProps) {
   }, [sightings, onMarkerClick]);
 
   return (
-    <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+    <div ref={mapContainer} className="absolute inset-0 w-full h-full z-0" />
   );
 }
 
