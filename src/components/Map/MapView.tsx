@@ -13,6 +13,7 @@ interface MapViewProps {
   sightings: IceSighting[];
   onMarkerClick: (sighting: IceSighting) => void;
   selectedSighting?: IceSighting | null;
+  onMapReady?: (flyTo: (lng: number, lat: number, zoom?: number) => void) => void;
 }
 
 // Convert meters to pixels at a given latitude and zoom level
@@ -20,10 +21,22 @@ function metersToPixelsAtMaxZoom(meters: number, latitude: number): number {
   return meters / 0.075 / Math.cos((latitude * Math.PI) / 180);
 }
 
-export default function MapView({ sightings, onMarkerClick, selectedSighting }: MapViewProps) {
+export default function MapView({ sightings, onMarkerClick, selectedSighting, onMapReady }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
+  // Expose flyTo function to parent
+  const flyToLocation = useCallback((lng: number, lat: number, zoom: number = 14) => {
+    if (map.current) {
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: zoom,
+        essential: true,
+        duration: 2000
+      });
+    }
+  }, []);
 
   // Fly to selected sighting
   useEffect(() => {
@@ -69,6 +82,37 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting }: 
     // Add sources and layers for radius circles when map loads
     map.current.on('load', () => {
       if (!map.current) return;
+
+      // Notify parent that map is ready
+      if (onMapReady) {
+        onMapReady(flyToLocation);
+      }
+
+      // Add click handler to show coordinates (for development)
+      
+      // const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true });
+      
+      // map.current.on('click', (e) => {
+      //   const coords = `[${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}]`;
+      //   const copyText = `{ name: 'Location Name', coordinates: [${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}], zoom: 14 },`;
+        
+      //   console.log(`Coordinates: ${coords}`);
+      //   console.log(`Copy this: ${copyText}`);
+        
+      //   // Show popup with coordinates
+      //   popup
+      //     .setLngLat(e.lngLat)
+      //     .setHTML(`
+      //       <div style="padding: 8px; font-family: monospace;">
+      //         <strong style="color: #dc2626;">Coordinates:</strong><br/>
+      //         <code style="background:rgb(0, 0, 0); padding: 4px 8px; border-radius: 4px; display: block; margin: 8px 0;">
+      //           ${coords}
+      //         </code>
+      //         <small style="color: #6b7280;">Check console for copy-paste format</small>
+      //       </div>
+      //     `)
+      //     .addTo(map.current!);
+      // });
 
       // Add empty source for sightings
       map.current.addSource('sightings-radius', {
@@ -146,7 +190,7 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting }: 
     return () => {
       map.current?.remove();
     };
-  }, []);
+  }, [onMapReady, flyToLocation]);
 
   // Update GeoJSON sources when sightings change
   useEffect(() => {

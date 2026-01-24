@@ -7,6 +7,7 @@ import { IceSighting, ReportFormData } from '@/lib/types';
 import { isExpired } from '@/lib/utils';
 import { Sidebar } from '@/components/UI/Sidebar';
 import MapView from '@/components/Map/MapView';
+import LocationDropdown from '@/components/Map/LocationDropdown';
 import ReportButton from '@/components/Report/ReportButton';
 import ReportSheet from '@/components/Report/ReportSheet';
 
@@ -14,6 +15,7 @@ export default function HomePage() {
   const [sightings, setSightings] = useState<IceSighting[]>([]);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [selectedSighting, setSelectedSighting] = useState<IceSighting | null>(null);
+  const [mapFlyTo, setMapFlyTo] = useState<((lng: number, lat: number, zoom?: number) => void) | null>(null);
 
   const handleSightingSelect = useCallback((sighting: IceSighting) => {
     setSelectedSighting(sighting);
@@ -22,6 +24,16 @@ export default function HomePage() {
   const handleBackToMap = useCallback(() => {
     setSelectedSighting(null);
   }, []);
+
+  const handleMapReady = useCallback((flyTo: (lng: number, lat: number, zoom?: number) => void) => {
+    setMapFlyTo(() => flyTo);
+  }, []);
+
+  const handleLocationSelect = useCallback((location: { coordinates: [number, number]; zoom?: number }) => {
+    if (mapFlyTo) {
+      mapFlyTo(location.coordinates[0], location.coordinates[1], location.zoom || 14);
+    }
+  }, [mapFlyTo]);
 
   // Subscribe to real-time sightings from Firebase
   useEffect(() => {
@@ -106,11 +118,17 @@ export default function HomePage() {
             sightings={sightings} 
             onMarkerClick={handleSightingSelect}
             selectedSighting={selectedSighting}
+            onMapReady={handleMapReady}
           />
         </div>
 
         {/* Overlay layer: UI elements on top of map */}
         <div className="absolute inset-0 z-[101] pointer-events-none [&>*]:pointer-events-auto">
+          {/* Location Dropdown - Top Center */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2">
+            <LocationDropdown onLocationSelect={handleLocationSelect} />
+          </div>
+
           <ReportButton onClick={() => setIsReportSheetOpen(true)} />
           <ReportSheet
             isOpen={isReportSheetOpen}
