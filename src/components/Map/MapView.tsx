@@ -87,7 +87,7 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting }: 
         paint: {
           'circle-radius': [
             'interpolate',
-            ['exponential', 2],
+            ['exponential', 2.8],
             ['zoom'],
             10, metersToPixelsAtMaxZoom(PING_RADIUS_METERS, 47.6) / Math.pow(2, 18 - 10),
             18, metersToPixelsAtMaxZoom(PING_RADIUS_METERS, 47.6),
