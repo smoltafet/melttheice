@@ -16,6 +16,7 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
   const [formData, setFormData] = useState<ReportFormData>({
     vehicleType: 'Van',
     vehicleColor: '',
+    vehicleMarked: true,
     personnelCount: 1,
     personnelDescription: '',
     activity: 'Patrolling',
@@ -50,6 +51,7 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
     setFormData({
       vehicleType: 'Van',
       vehicleColor: '',
+      vehicleMarked: true,
       personnelCount: 1,
       personnelDescription: '',
       activity: 'Patrolling',
@@ -61,7 +63,7 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
     { value: 'Van', label: 'Van', icon: '🚐' },
     { value: 'SUV', label: 'SUV', icon: '🚙' },
     { value: 'Sedan', label: 'Sedan', icon: '🚗' },
-    { value: 'Unmarked', label: 'Unmarked', icon: '🚘' },
+    { value: 'Truck', label: 'Truck', icon: '🛻' },
   ];
 
   const activities = [
@@ -144,7 +146,7 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
                     </div>
                   </div>
 
-                  {/* Vehicle Color & Personnel Count */}
+                  {/* Vehicle Color & Marked/Unmarked Toggle */}
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Vehicle Color</label>
@@ -160,31 +162,58 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <Users className="w-4 h-4 text-gray-600" />
-                        <label className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Personnel Count</label>
-                      </div>
-                      <div className="flex items-center gap-3">
+                      <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Vehicle Status</label>
+                      <div className="flex gap-4">
                         <button
                           type="button"
-                          onClick={() => setFormData({ ...formData, personnelCount: Math.max(1, formData.personnelCount - 1) })}
-                          className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
-                                   flex items-center justify-center text-2xl text-gray-600 transition-all"
+                          onClick={() => setFormData({ ...formData, vehicleMarked: true })}
+                          className={`flex-1 py-4 rounded-xl border-2 transition-all duration-200 font-medium
+                            ${formData.vehicleMarked 
+                              ? 'border-red-500 bg-red-50 text-red-600 shadow-lg shadow-red-100' 
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}`}
                         >
-                          −
+                          Marked
                         </button>
-                        <div className="flex-1 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
-                          <span className="text-2xl font-bold text-gray-800">{formData.personnelCount}</span>
-                        </div>
                         <button
                           type="button"
-                          onClick={() => setFormData({ ...formData, personnelCount: formData.personnelCount + 1 })}
-                          className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
-                                   flex items-center justify-center text-2xl text-gray-600 transition-all"
+                          onClick={() => setFormData({ ...formData, vehicleMarked: false })}
+                          className={`flex-1 py-4 rounded-xl border-2 transition-all duration-200 font-medium
+                            ${!formData.vehicleMarked 
+                              ? 'border-red-500 bg-red-50 text-red-600 shadow-lg shadow-red-100' 
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'}`}
                         >
-                          +
+                          Unmarked
                         </button>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Personnel Count */}
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <Users className="w-4 h-4 text-gray-600" />
+                      <label className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Personnel Count</label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, personnelCount: Math.max(1, formData.personnelCount - 1) })}
+                        className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
+                                 flex items-center justify-center text-2xl text-gray-600 transition-all"
+                      >
+                        −
+                      </button>
+                      <div className="flex-1 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-gray-800">{formData.personnelCount}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, personnelCount: formData.personnelCount + 1 })}
+                        className="w-14 h-14 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 
+                                 flex items-center justify-center text-2xl text-gray-600 transition-all"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
 

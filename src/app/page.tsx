@@ -73,6 +73,7 @@ export default function HomePage() {
         vehicle: {
           type: data.vehicleType,
           color: data.vehicleColor,
+          marked: data.vehicleMarked,
         },
         personnel: {
           count: data.personnelCount,

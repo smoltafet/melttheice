@@ -86,6 +86,16 @@ export default function SightingDetailSheet({ sighting, onClose }: SightingDetai
                         <span className="text-white font-medium">{sighting.vehicle.color}</span>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white/60 min-w-[80px]">Status:</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        sighting.vehicle.marked 
+                          ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {sighting.vehicle.marked ? 'Marked' : 'Unmarked'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
