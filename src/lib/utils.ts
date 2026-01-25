@@ -49,6 +49,12 @@ export function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
       return;
     }
 
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000, // Increased to 10 seconds
+      maximumAge: 0,
+    };
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
@@ -57,13 +63,23 @@ export function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
         });
       },
       (error) => {
-        reject(error);
+        // If high accuracy fails or times out, try one more time without high accuracy
+        if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              resolve({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+              });
+            },
+            (err) => reject(err),
+            { ...options, enableHighAccuracy: false, timeout: 5000 }
+          );
+        } else {
+          reject(error);
+        }
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0,
-      }
+      options
     );
   });
 }

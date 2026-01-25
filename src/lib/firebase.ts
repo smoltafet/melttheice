@@ -42,9 +42,20 @@ export const storage: FirebaseStorage = getStorage(app);
 import { getAuth, Auth } from 'firebase/auth';
 export const auth: Auth = getAuth(app);
 
-// Initialize Messaging
-import { getMessaging, Messaging } from 'firebase/messaging';
-export const messaging: Messaging | null = typeof window !== 'undefined' ? getMessaging(app) : null;
+// Initialize Messaging (with browser support check)
+import { getMessaging, Messaging, isSupported } from 'firebase/messaging';
 
+let messaging: Messaging | null = null;
+if (typeof window !== 'undefined') {
+  isSupported().then((supported) => {
+    if (supported) {
+      messaging = getMessaging(app);
+    }
+  }).catch(() => {
+    console.warn('Firebase Messaging not supported in this browser');
+  });
+}
+
+export { messaging };
 export { analytics };
 export default app;

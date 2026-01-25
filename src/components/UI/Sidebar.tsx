@@ -555,15 +555,23 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
       return;
     }
 
-    if (!messaging) {
-      setError("Messaging not supported on this device.");
-      return;
-    }
-
     setNotifLoading(true);
     setError(null);
 
     try {
+      // Wait a moment for messaging to initialize if needed
+      let retries = 0;
+      while (!messaging && retries < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+
+      if (!messaging) {
+        setError("Push notifications not supported in this browser. Try Chrome, Firefox, or Edge.");
+        setNotifLoading(false);
+        return;
+      }
+
       if (!notificationsEnabled) {
         // Request permission
         const permission = await Notification.requestPermission();

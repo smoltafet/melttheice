@@ -7,19 +7,22 @@ const twilioClient = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
+// Initialize Firebase Admin (only if credentials are present)
+if (!admin.apps.length && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  try {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey,
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to initialize Firebase Admin:', error);
+  }
 }
-
-const db = admin.firestore();
-const messaging = admin.messaging();
 
 /**
  * Calculate distance between two points in km
@@ -38,6 +41,14 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if Firebase Admin is properly initialized
+    if (!admin.apps.length) {
+      console.error('Firebase Admin not initialized - missing credentials');
+      return NextResponse.json({ 
+        error: 'Server configuration error. Alerts are disabled.' 
+      }, { status: 503 });
+    }
+
     const { sighting } = await req.json();
 
     if (!sighting || !sighting.location) {
@@ -47,6 +58,10 @@ export async function POST(req: NextRequest) {
     const { lat, lng } = sighting.location;
     const alertRadius = 2; // 2km radius
 
+    // Get Firebase services
+    const db = admin.firestore();
+    const messaging = admin.messaging();
+
     // 1. Fetch all users with notifications enabled
     const usersSnapshot = await db.collection('users')
       .where('notificationsEnabled', '==', true)
@@ -54,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const notifications: Promise<any>[] = [];
 
-    usersSnapshot.forEach((userDoc) => {
+    usersSnapshot.forEach((userDoc: any) => {
       const userData = userDoc.data();
       const userLocation = userData.lastKnownLocation;
 
@@ -82,7 +97,7 @@ export async function POST(req: NextRequest) {
                   link: 'https://melttheice.us',
                 },
               },
-            }).catch(err => console.error(`FCM error for ${userDoc.id}:`, err))
+            }).catch((err: any) => console.error(`FCM error for ${userDoc.id}:`, err))
           );
         }
 
@@ -93,7 +108,7 @@ export async function POST(req: NextRequest) {
               body: messageBody,
               from: process.env.TWILIO_PHONE_NUMBER,
               to: userData.phoneNumber,
-            }).catch(err => console.error(`SMS error for ${userDoc.id}:`, err))
+            }).catch((err: any) => console.error(`SMS error for ${userDoc.id}:`, err))
           );
         }
       }
