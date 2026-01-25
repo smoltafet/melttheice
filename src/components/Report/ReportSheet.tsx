@@ -148,7 +148,7 @@ export default function ReportSheet({ isOpen, onClose, onSubmit }: ReportSheetPr
     { value: 'Van', label: 'Van', icon: '🚐' },
     { value: 'SUV', label: 'SUV', icon: '🚙' },
     { value: 'Sedan', label: 'Sedan', icon: '🚗' },
-    { value: 'Unmarked', label: 'Unmarked', icon: '🚘' },
+    { value: 'On foot', label: 'On foot', icon: '👣' },
   ];
 
   const activities = [

@@ -8,7 +8,7 @@ export interface IceSighting {
     lng: number;
   };
   vehicle: {
-    type: 'Van' | 'SUV' | 'Sedan' | 'Unmarked';
+    type: 'Van' | 'SUV' | 'Sedan' | 'On foot';
     color: string;
   };
   personnel: {
@@ -33,7 +33,7 @@ export interface IceSighting {
 }
 
 export interface ReportFormData {
-  vehicleType: 'Van' | 'SUV' | 'Sedan' | 'Unmarked';
+  vehicleType: 'Van' | 'SUV' | 'Sedan' | 'On foot';
   vehicleColor: string;
   personnelCount: number;
   personnelDescription: string;

@@ -71,6 +71,16 @@ export default function HomePage() {
     return () => unsubscribe();
   }, []);
 
+  // Sync selectedSighting with real-time updates
+  useEffect(() => {
+    if (selectedSighting) {
+      const updatedSighting = sightings.find(s => s.id === selectedSighting.id);
+      if (updatedSighting && updatedSighting !== selectedSighting) {
+        setSelectedSighting(updatedSighting);
+      }
+    }
+  }, [sightings, selectedSighting]);
+
   // Handle sighting report submission
   const handleReportSubmit = useCallback(async (data: ReportFormData, imageFile?: File) => {
     if (!data.location) {
