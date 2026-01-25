@@ -3,7 +3,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { IceSighting } from '@/lib/types';
-import { calculateOpacity } from '@/lib/utils';
+import { calculateOpacity, hexToRgba } from '@/lib/utils';
+import { useSettings, ColorMode } from '@/lib/settings-context';
 import { MAPBOX_TOKEN, DEFAULT_MAP_CONFIG, PING_RADIUS_METERS, SEATTLE_METRO_BOUNDS } from '@/lib/mapbox';
 
 // Set Mapbox access token
@@ -16,6 +17,15 @@ interface MapViewProps {
   onMapReady?: (flyTo: (lng: number, lat: number, zoom?: number) => void) => void;
 }
 
+// Map color modes to Hex codes for Mapbox paint properties
+const MODE_COLORS: Record<ColorMode, string> = {
+  default: '#EF4444',      // Red-500
+  protanopia: '#2563EB',   // Blue-600
+  deuteranopia: '#4F46E5', // Indigo-600
+  tritanopia: '#E11D48',   // Rose-600
+  achromatopsia: '#000000' // Black
+};
+
 // Convert meters to pixels at a given latitude and zoom level
 function metersToPixelsAtMaxZoom(meters: number, latitude: number): number {
   return meters / 0.075 / Math.cos((latitude * Math.PI) / 180);
@@ -25,6 +35,7 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting, on
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const { colorMode } = useSettings();
 
   // Expose flyTo function to parent
   const flyToLocation = useCallback((lng: number, lat: number, zoom: number = 14) => {
@@ -265,7 +276,37 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting, on
 
     map.current.off('click', 'sightings-centers-dot', handleClick);
     map.current.on('click', 'sightings-centers-dot', handleClick);
+    map.current.off('click', 'sightings-centers-dot', handleClick);
+    map.current.on('click', 'sightings-centers-dot', handleClick);
   }, [sightings, onMarkerClick]);
+
+  // Update map colors when settings change
+  useEffect(() => {
+    if (!map.current) return;
+
+    const primaryColor = MODE_COLORS[colorMode];
+
+    const updateLayerColors = () => {
+      if (!map.current?.isStyleLoaded()) return;
+
+      // Update radius fill
+      if (map.current.getLayer('sightings-radius-fill')) {
+        map.current.setPaintProperty('sightings-radius-fill', 'circle-color', hexToRgba(primaryColor, 0.4));
+        map.current.setPaintProperty('sightings-radius-fill', 'circle-stroke-color', hexToRgba(primaryColor, 0.8));
+      }
+
+      // Update center dots
+      if (map.current.getLayer('sightings-centers-dot')) {
+        map.current.setPaintProperty('sightings-centers-dot', 'circle-color', primaryColor);
+      }
+    };
+
+    if (map.current.isStyleLoaded()) {
+      updateLayerColors();
+    } else {
+      map.current.once('load', updateLayerColors);
+    }
+  }, [colorMode]);
 
   return (
     <div ref={mapContainer} className="absolute inset-0 w-full h-full z-0" />

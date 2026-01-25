@@ -27,10 +27,35 @@ if (!getApps().length) {
 export const db: Firestore = getFirestore(app);
 
 // Initialize Analytics (only in browser)
+// Initialize Analytics (only in browser)
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+
 let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
   analytics = getAnalytics(app);
 }
 
+// Initialize Storage
+export const storage: FirebaseStorage = getStorage(app);
+
+// Initialize Auth
+import { getAuth, Auth } from 'firebase/auth';
+export const auth: Auth = getAuth(app);
+
+// Initialize Messaging (with browser support check)
+import { getMessaging, Messaging, isSupported } from 'firebase/messaging';
+
+let messaging: Messaging | null = null;
+if (typeof window !== 'undefined') {
+  isSupported().then((supported) => {
+    if (supported) {
+      messaging = getMessaging(app);
+    }
+  }).catch(() => {
+    console.warn('Firebase Messaging not supported in this browser');
+  });
+}
+
+export { messaging };
 export { analytics };
 export default app;

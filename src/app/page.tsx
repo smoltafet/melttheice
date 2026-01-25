@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, addDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, Timestamp, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { IceSighting, ReportFormData } from '@/lib/types';
 import { isExpired } from '@/lib/utils';
@@ -53,6 +53,9 @@ export default function HomePage() {
             vehicle: data.vehicle,
             personnel: data.personnel,
             behavior: data.behavior,
+            imageUrl: data.imageUrl,
+            upvotes: data.upvotes || 0,
+            downvotes: data.downvotes || 0,
           };
 
           // Filter out expired sightings (older than 4 hours)
@@ -72,14 +75,37 @@ export default function HomePage() {
   }, []);
 
   // Handle sighting report submission
-  const handleReportSubmit = useCallback(async (data: ReportFormData) => {
+  const handleReportSubmit = useCallback(async (data: ReportFormData, imageFile?: File) => {
     if (!data.location) {
       alert('Location is required');
       return;
     }
 
     try {
-      await addDoc(collection(db, 'sightings'), {
+      // Generate a specific ID for the report
+      const reportId = crypto.randomUUID();
+      const sightingRef = doc(db, 'sightings', reportId);
+      
+      let imageUrl = null;
+
+      // Upload image if provided
+      if (imageFile) {
+        try {
+           const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+           const { storage } = await import('@/lib/firebase');
+           
+           const storageRef = ref(storage, `sightings/${reportId}/${imageFile.name}`);
+           const snapshot = await uploadBytes(storageRef, imageFile);
+           imageUrl = await getDownloadURL(snapshot.ref);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          // Continue submission even if image upload fails, but maybe alert user?
+          // For now we just log it and continue without image
+        }
+      }
+
+      await setDoc(sightingRef, {
+        id: reportId,
         timestamp: Date.now(),
         location: data.location,
         vehicle: {
@@ -95,9 +121,25 @@ export default function HomePage() {
           activity: data.activity,
           itemsHeld: data.itemsHeld,
         },
+        imageUrl: imageUrl || undefined,
+        upvotes: 0,
+        downvotes: 0,
       });
 
       console.log('Sighting reported successfully');
+
+      // Trigger alerts via API
+      fetch('/api/send-alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sighting: { 
+            location: data.location,
+            vehicle: { type: data.vehicleType, color: data.vehicleColor }
+          } 
+        }),
+      }).catch(err => console.error('Error triggering alerts:', err));
+
     } catch (error) {
       console.error('Error reporting sighting:', error);
       alert('Failed to submit report. Please try again.');

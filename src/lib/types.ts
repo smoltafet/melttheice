@@ -20,6 +20,9 @@ export interface IceSighting {
     activity: 'Patrolling' | 'Processing' | 'Stationary' | 'Other';
     itemsHeld: string;
   };
+  imageUrl?: string;
+  upvotes: number;
+  downvotes: number;
 }
 
 export interface ReportFormData {
@@ -34,4 +37,5 @@ export interface ReportFormData {
     lat: number;
     lng: number;
   };
+  imageUrl?: string;
 }
