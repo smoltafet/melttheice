@@ -22,6 +22,14 @@ export interface IceSighting {
   imageUrl?: string;
   upvotes: number;
   downvotes: number;
+  verification?: {
+    stillThere: number;
+    notThere: number;
+  };
+  updates?: {
+    text: string;
+    timestamp: number;
+  }[];
 }
 
 export interface ReportFormData {

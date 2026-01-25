@@ -9,11 +9,13 @@ import { Sidebar } from '@/components/UI/Sidebar';
 import MapView from '@/components/Map/MapView';
 import ReportButton from '@/components/Report/ReportButton';
 import ReportSheet from '@/components/Report/ReportSheet';
+import LocationDropdown, { Location } from '@/components/Map/LocationDropdown';
 
 export default function HomePage() {
   const [sightings, setSightings] = useState<IceSighting[]>([]);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [selectedSighting, setSelectedSighting] = useState<IceSighting | null>(null);
+  const [viewLocation, setViewLocation] = useState<Location | null>(null);
 
   const handleSightingSelect = useCallback((sighting: IceSighting) => {
     setSelectedSighting(sighting);
@@ -21,6 +23,11 @@ export default function HomePage() {
 
   const handleBackToMap = useCallback(() => {
     setSelectedSighting(null);
+  }, []);
+
+  const handleLocationSelect = useCallback((location: Location) => {
+    setViewLocation(location);
+    setSelectedSighting(null); // Clear selected sighting when moving to a new area
   }, []);
 
   // Subscribe to real-time sightings from Firebase
@@ -116,6 +123,7 @@ export default function HomePage() {
       console.log('Sighting reported successfully');
 
       // Trigger alerts via API
+      console.log('🚨 Triggering proximity alerts...');
       fetch('/api/send-alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +133,20 @@ export default function HomePage() {
             vehicle: { type: data.vehicleType, color: data.vehicleColor }
           } 
         }),
-      }).catch(err => console.error('Error triggering alerts:', err));
+      })
+        .then(async (response) => {
+          const result = await response.json();
+          console.log('✅ Alert API response:', result);
+          if (result.smsAttempts > 0) {
+            console.log(`📱 ${result.smsAttempts} SMS alert(s) sent`);
+          }
+          if (result.fcmAttempts > 0) {
+            console.log(`📲 ${result.fcmAttempts} push notification(s) sent`);
+          }
+        })
+        .catch(err => {
+          console.error('❌ Error triggering alerts:', err);
+        });
 
     } catch (error) {
       console.error('Error reporting sighting:', error);
@@ -147,11 +168,17 @@ export default function HomePage() {
             sightings={sightings} 
             onMarkerClick={handleSightingSelect}
             selectedSighting={selectedSighting}
+            viewLocation={viewLocation}
           />
         </div>
 
         {/* Overlay layer: UI elements on top of map */}
         <div className="absolute inset-0 z-[101] pointer-events-none [&>*]:pointer-events-auto">
+          {/* Location Dropdown - Top Right */}
+          <div className="absolute top-6 right-6">
+            <LocationDropdown onLocationSelect={handleLocationSelect} />
+          </div>
+
           <ReportButton onClick={() => setIsReportSheetOpen(true)} />
           <ReportSheet
             isOpen={isReportSheetOpen}

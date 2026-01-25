@@ -7,6 +7,19 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_T
   ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
   : null;
 
+// Log Twilio initialization status
+if (twilioClient) {
+  console.log('✅ Twilio client initialized successfully');
+  console.log('📱 Twilio phone number:', process.env.TWILIO_PHONE_NUMBER);
+} else {
+  console.warn('⚠️ Twilio client not initialized - missing credentials');
+  console.warn('Missing:', {
+    accountSid: !process.env.TWILIO_ACCOUNT_SID,
+    authToken: !process.env.TWILIO_AUTH_TOKEN,
+    phoneNumber: !process.env.TWILIO_PHONE_NUMBER
+  });
+}
+
 // Helper function to initialize Firebase Admin only when needed
 function getFirebaseAdmin() {
   if (!admin.apps.length) {
@@ -78,7 +91,11 @@ export async function POST(req: NextRequest) {
       .where('notificationsEnabled', '==', true)
       .get();
 
+    console.log(`📊 Found ${usersSnapshot.size} user(s) with notifications enabled`);
+
     const notifications: Promise<any>[] = [];
+    let smsAttempts = 0;
+    let fcmAttempts = 0;
 
     usersSnapshot.forEach((userDoc: any) => {
       const userData = userDoc.data();
@@ -108,6 +125,8 @@ export async function POST(req: NextRequest) {
 
         // 2a. Send Push Notification (FCM)
         if (userData.fcmToken) {
+          fcmAttempts++;
+          console.log(`📲 Sending FCM to user ${userDoc.id}`);
           notifications.push(
             messaging.send({
               token: userData.fcmToken,
@@ -120,26 +139,67 @@ export async function POST(req: NextRequest) {
                   link: 'https://melttheice.us',
                 },
               },
-            }).catch((err: any) => console.error(`FCM error for ${userDoc.id}:`, err))
+            }).then(() => {
+              console.log(`✅ FCM sent successfully to user ${userDoc.id}`);
+            }).catch((err: any) => {
+              console.error(`❌ FCM error for ${userDoc.id}:`, err.message);
+            })
           );
         }
 
         // 2b. Send SMS (Twilio) - if preference set or just send both for now
         if (userData.phoneNumber && twilioClient) {
-          notifications.push(
-            twilioClient.messages.create({
-              body: messageBody,
-              from: process.env.TWILIO_PHONE_NUMBER,
-              to: userData.phoneNumber,
-            }).catch((err: any) => console.error(`SMS error for ${userDoc.id}:`, err))
-          );
+          // Validate phone number format (E.164)
+          const phoneNumber = userData.phoneNumber;
+          const isValidFormat = /^\+[1-9]\d{1,14}$/.test(phoneNumber);
+          
+          if (!isValidFormat) {
+            console.warn(`⚠️ Invalid phone number format for user ${userDoc.id}: ${phoneNumber}`);
+          } else {
+            smsAttempts++;
+            console.log(`📱 Attempting SMS to ${phoneNumber} (user ${userDoc.id})`);
+            notifications.push(
+              twilioClient.messages.create({
+                body: messageBody,
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: phoneNumber,
+              }).then((message: any) => {
+                console.log(`✅ SMS sent successfully to ${phoneNumber}, SID: ${message.sid}`);
+              }).catch((err: any) => {
+                console.error(`❌ SMS error for ${phoneNumber} (user ${userDoc.id}):`, {
+                  code: err.code,
+                  message: err.message,
+                  status: err.status
+                });
+              })
+            );
+          }
+        } else {
+          if (!userData.phoneNumber) {
+            console.log(`ℹ️ User ${userDoc.id} has no phone number stored`);
+          }
+          if (!twilioClient) {
+            console.warn(`⚠️ Twilio client not available for user ${userDoc.id}`);
+          }
         }
       }
     });
 
     await Promise.all(notifications);
 
-    return NextResponse.json({ success: true, alertedCount: notifications.length });
+    console.log(`✨ Alert processing complete:`, {
+      totalNotifications: notifications.length,
+      fcmAttempts,
+      smsAttempts,
+      usersInRange: usersSnapshot.size
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      alertedCount: notifications.length,
+      fcmAttempts,
+      smsAttempts 
+    });
   } catch (error: any) {
     console.error('Alert processing error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

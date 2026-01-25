@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { toBlob } from "html-to-image";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff } from "lucide-react";
+import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff, Share2 } from "lucide-react";
 import { IceSighting } from "@/lib/types";
-import { doc, updateDoc, increment, getDoc, setDoc } from "firebase/firestore";
+import { doc, updateDoc, increment, getDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { db, auth, messaging } from "@/lib/firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, User, ConfirmationResult } from "firebase/auth";
 import { useSettings, ColorMode, TextSize } from "@/lib/settings-context";
@@ -66,6 +67,54 @@ const SightingDetailView = ({
   const { t } = useLanguage();
   const urgency = getUrgencyLevel(sighting.timestamp);
   const colors = getUrgencyColors(urgency);
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  const [updateText, setUpdateText] = useState("");
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+
+  const handleVerification = async (isStillThere: boolean) => {
+    console.log(`Attempting verification vote: ${isStillThere ? 'YES' : 'NO'} for sighting ${sighting.id}`);
+    try {
+      if (!sighting.id) {
+        console.error("Sighting ID is missing");
+        return;
+      }
+      const sightingRef = doc(db, 'sightings', sighting.id);
+      await updateDoc(sightingRef, {
+        [`verification.${isStillThere ? 'stillThere' : 'notThere'}`]: increment(1)
+      });
+      console.log("Verification vote successful");
+    } catch (error) {
+      console.error("Error updating verification:", error);
+    }
+  };
+
+  const handleAddUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!updateText.trim()) return;
+
+    console.log(`Attempting to add update for sighting ${sighting.id}: ${updateText}`);
+    setIsSubmittingUpdate(true);
+    try {
+      if (!sighting.id) {
+        console.error("Sighting ID is missing");
+        return;
+      }
+      const sightingRef = doc(db, 'sightings', sighting.id);
+      await updateDoc(sightingRef, {
+        updates: arrayUnion({
+          text: updateText.trim(),
+          timestamp: Date.now()
+        })
+      });
+      console.log("Update added successfully");
+      setUpdateText("");
+    } catch (error) {
+      console.error("Error adding update:", error);
+    } finally {
+      setIsSubmittingUpdate(false);
+    }
+  };
 
   const urgencyLabels = {
     high: t('urgency.high'),
@@ -80,22 +129,87 @@ const SightingDetailView = ({
     lg: textSize === 'lg' ? 'text-xl' : textSize === 'xl' ? 'text-2xl' : 'text-lg',
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: '🚨 ICE Sighting Alert',
+      text: `⚠️ ICE Sighting Reported!\n\n📍 Location: Near ${sighting.location.lat.toFixed(4)}, ${sighting.location.lng.toFixed(4)}\n🚙 Vehicle: ${sighting.vehicle.color} ${sighting.vehicle.type}\n⏰ Time: ${formatTimeAgo(sighting.timestamp)}\n\nStay safe! See details:`,
+      url: 'https://melttheice.us'
+    };
+
+    try {
+      let file: File | null = null;
+      if (contentRef.current) {
+        try {
+          // Generate image from the content
+          const blob = await toBlob(contentRef.current, {
+            cacheBust: true,
+            backgroundColor: '#ffffff',
+            filter: (node) => {
+              // Exclude the header from the image
+              return node instanceof Element && node.id !== 'no-share-header';
+            },
+            style: {
+              height: 'auto',
+              overflow: 'visible',
+              maxHeight: 'none'
+            }
+          });
+
+          if (blob) {
+            file = new File([blob], 'ice-sighting.png', { type: blob.type });
+          }
+        } catch (imgErr) {
+          console.error('Error generating image:', imgErr);
+        }
+      }
+
+      // Check if we can share files
+      if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        await navigator.share({
+          files: [file],
+          title: shareData.title,
+          text: shareData.text,
+          url: shareData.url
+        });
+      } else if (navigator.share) {
+        // Fallback to text share
+        await navigator.share(shareData);
+      } else {
+        // Fallback to clipboard
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        alert('Link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+      // Final fallback if share fails (e.g. user cancelled)
+    }
+  };
+
   return (
     <motion.div 
-      className="flex flex-col h-full"
+      ref={contentRef}
+      className="flex flex-col h-full bg-white"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.2 }}
     >
       {/* Back Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div id="no-share-header" className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors group"
         >
           <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
           <span className="font-medium">{t('sidebar.all')}</span>
+        </button>
+
+        <button
+          onClick={handleShare}
+          className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+          title="Share Sighting"
+        >
+          <Share2 className="w-5 h-5" />
         </button>
       </div>
 
@@ -235,6 +349,76 @@ const SightingDetailView = ({
             </div>
           </div>
         </div>
+
+        {/* Verification Section */}
+        <div className="mb-8">
+           <div className="flex items-center gap-2 mb-4">
+            <Eye className="w-5 h-5 text-gray-600" />
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Verification</h3>
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-5">
+            <p className={`text-gray-700 font-medium mb-4 ${textClasses.base}`}>Is this still there?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleVerification(true)}
+                className="flex-1 bg-white border border-gray-200 rounded-xl py-3 px-4 flex items-center justify-center gap-2 shadow-sm hover:bg-green-50 hover:border-green-200 transition-colors"
+              >
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="font-medium text-gray-900">Yes ({sighting.verification?.stillThere || 0})</span>
+              </button>
+              <button 
+                onClick={() => handleVerification(false)}
+                className="flex-1 bg-white border border-gray-200 rounded-xl py-3 px-4 flex items-center justify-center gap-2 shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors"
+                >
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="font-medium text-gray-900">No ({sighting.verification?.notThere || 0})</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Updates Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+             <Bell className="w-5 h-5 text-gray-600" />
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Updates</h3>
+          </div>
+          
+           <div className="space-y-4">
+            {/* Existing Updates */}
+            {sighting.updates && sighting.updates.map((update, index) => (
+              <div key={index} className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                <p className={`text-gray-800 ${textClasses.base}`}>{update.text}</p>
+                <div className="mt-2 flex items-center gap-2 text-blue-600 text-xs font-medium">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatTimeAgo(update.timestamp)}</span>
+                </div>
+              </div>
+            ))}
+
+            {/* Add Update Form */}
+            <form onSubmit={handleAddUpdate} className="bg-gray-50 rounded-2xl p-5">
+              <label className={`block text-gray-700 font-medium mb-2 ${textClasses.sm}`}>
+                Add more description
+              </label>
+              <textarea
+                value={updateText}
+                onChange={(e) => setUpdateText(e.target.value)}
+                placeholder="Details about movement, specific location, or changes..."
+                className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-base mb-3 resize-none"
+                rows={3}
+              />
+              <button
+                type="submit"
+                disabled={!updateText.trim() || isSubmittingUpdate}
+                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {isSubmittingUpdate ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                Add Update
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
@@ -346,270 +530,105 @@ const SightingCard = ({
   );
 };
 
-// Settings View Component
+// Settings View Component (Simplified - No Phone Auth)
 const SettingsView = ({ onBack }: { onBack: () => void }) => {
   const { colorMode, setColorMode, textSize, setTextSize } = useSettings();
   const { t } = useLanguage();
   
-  // Auth State
-  const [user, setUser] = useState<User | null>(null);
+  // Simple state for SMS alerts
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [notifLoading, setNotifLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Monitor Auth State
+  // Check if user has existing alert settings on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setConfirmationResult(null);
-        setVerificationCode("");
-        setPhoneNumber("");
+    const checkExistingSettings = async () => {
+      try {
+        // Check localStorage for userId
+        const storedUserId = localStorage.getItem('alertUserId');
+        if (storedUserId) {
+          setUserId(storedUserId);
+          const userDoc = await getDoc(doc(db, 'users', storedUserId));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setPhoneNumber(data.phoneNumber || "");
+            setNotificationsEnabled(data.notificationsEnabled || false);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking existing settings:", err);
       }
-    });
-    return () => unsubscribe();
+    };
+    checkExistingSettings();
   }, []);
 
-  // Fetch initial notification status
-  useEffect(() => {
-    const fetchNotifStatus = async () => {
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setNotificationsEnabled(userDoc.data().notificationsEnabled || false);
-          } else {
-            // Create user doc if it doesn't exist
-            await setDoc(doc(db, 'users', user.uid), {
-              phoneNumber: user.phoneNumber,
-              notificationsEnabled: false,
-              createdAt: Date.now()
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching user notif status:", err);
-        }
-      }
-    };
-    fetchNotifStatus();
-  }, [user]);
-
-  // Track user location for alerts
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    const updateLocation = async () => {
-      if (user && notificationsEnabled) {
-        try {
-          const location = await getCurrentLocation();
-          await updateDoc(doc(db, 'users', user.uid), {
-            lastKnownLocation: location,
-            updatedAt: Date.now()
-          });
-        } catch (err) {
-          console.error("Error updating location for alerts:", err);
-        }
-      }
-    };
-
-    if (user && notificationsEnabled) {
-      updateLocation();
-      interval = setInterval(updateLocation, 5 * 60 * 1000); // Update every 5 mins
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [user, notificationsEnabled]);
-
-  // Initialize Recaptcha
-  useEffect(() => {
-    const initRecaptcha = async () => {
-      if (!user && !confirmationResult && !window.recaptchaVerifier) {
-        try {
-          const { RecaptchaVerifier } = await import("firebase/auth");
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible',
-            'callback': () => {
-              // reCAPTCHA solved
-            },
-            'expired-callback': () => {
-               // Reset if expired
-               if (window.recaptchaVerifier) {
-                 window.recaptchaVerifier.clear();
-                 window.recaptchaVerifier = undefined;
-               }
-            }
-          });
-          // Pre-render to ensure it's ready
-          window.recaptchaVerifier.render();
-        } catch (err) {
-          console.error("Recaptcha init error:", err);
-        }
-      }
-    };
-
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      initRecaptcha();
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-          window.recaptchaVerifier = undefined;
-        } catch (e) {
-          console.error("Error clearing recaptcha", e);
-        }
-      }
-    };
-  }, [user, confirmationResult]);
-
-  const onSignInSubmit = async () => {
-    setError(null);
-    setLoading(true);
-
-    // Basic validation
-    if (!phoneNumber.startsWith('+')) {
-      setError("Please include your country code (e.g., +1 for USA).");
-      setLoading(false);
-      return;
-    }
-
-    if (phoneNumber.length < 10) {
-      setError("Please enter a valid phone number.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      if (!window.recaptchaVerifier) {
-         // Try to re-init if missing
-         const { RecaptchaVerifier } = await import("firebase/auth");
-         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible',
-            'callback': () => {}
-         });
-      }
-      
-      const appVerifier = window.recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      setConfirmationResult(confirmation);
-      setLoading(false);
-    } catch (err: any) {
-      console.error("Error sending code:", err);
-      if (err.code === 'auth/invalid-app-credential') {
-        setError("Domain not authorized. Check Firebase Console whitelisting.");
-      } else if (err.code === 'auth/captcha-check-failed') {
-        setError("Captcha check failed. Make sure your domain (e.g., localhost) is added to 'Authorized Domains' in Firebase Console.");
-      } else if (err.code === 'auth/too-many-requests') {
-        setError("Too many attempts. Please try again later or use a test number.");
-      } else {
-        // Show the actual error message and code for debugging
-        setError(`${err.message} (${err.code || 'unknown'})`);
-      }
-      setLoading(false);
-      
-      // Reset recaptcha if error
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-          window.recaptchaVerifier = undefined;
-        } catch (e) {
-          console.error("Error clearing recaptcha", e);
-        }
-      }
-    }
-  };
-
-  const onVerifyCode = async () => {
-    if (!confirmationResult) return;
-    setError(null);
-    setLoading(true);
-
-    try {
-      await confirmationResult.confirm(verificationCode);
-      // User is verified and signed in handled by onAuthStateChanged
-      setLoading(false);
-    } catch (err: any) {
-      console.error("Error verifying code:", err);
-      setError("Invalid verification code. Please try again.");
-      setLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error("Error signing out:", err);
-    }
-  };
-
   const handleToggleNotifications = async () => {
-    if (!user) {
-      setError("Please sign in to enable notifications.");
-      return;
-    }
-
-    setNotifLoading(true);
     setError(null);
+    setLoading(true);
 
     try {
-      // Wait a moment for messaging to initialize if needed
-      let retries = 0;
-      while (!messaging && retries < 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        retries++;
-      }
-
-      if (!messaging) {
-        setError("Push notifications not supported in this browser. Try Chrome, Firefox, or Edge.");
-        setNotifLoading(false);
-        return;
-      }
-
       if (!notificationsEnabled) {
-        // Request permission
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const { getToken } = await import('firebase/messaging');
-          const token = await getToken(messaging, { 
-            vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY 
-          });
-          
-          if (token) {
-            // Store token in Firestore
-            await updateDoc(doc(db, 'users', user.uid), {
-              fcmToken: token,
-              notificationsEnabled: true,
-              lastKnownLocation: null, // To be updated during sightings
-              updatedAt: Date.now()
-            });
-            setNotificationsEnabled(true);
-          }
-        } else {
-          setError("Notification permission denied.");
+        // Enabling notifications
+        
+        // Validate phone number
+        if (!phoneNumber.startsWith('+')) {
+          setError("Please include your country code (e.g., +1 for USA).");
+          setLoading(false);
+          return;
         }
-      } else {
-        // Disable notifications
-        await updateDoc(doc(db, 'users', user.uid), {
-          notificationsEnabled: false,
+
+        const isValidFormat = /^\+[1-9]\d{1,14}$/.test(phoneNumber);
+        if (!isValidFormat) {
+          setError("Invalid phone number format. Use E.164 format: +1234567890");
+          setLoading(false);
+          return;
+        }
+
+        // Get user's location
+        console.log("📍 Getting user location...");
+        const location = await getCurrentLocation();
+        console.log("✅ Location captured:", location);
+
+        // Generate or use existing userId
+        const uid = userId || crypto.randomUUID();
+        
+        // Store in Firestore
+        await setDoc(doc(db, 'users', uid), {
+          phoneNumber: phoneNumber,
+          location: location,
+          notificationsEnabled: true,
+          createdAt: Date.now(),
           updatedAt: Date.now()
         });
+
+        // Store userId in localStorage
+        localStorage.setItem('alertUserId', uid);
+        setUserId(uid);
+        setNotificationsEnabled(true);
+        
+        console.log("✅ SMS alerts enabled for", phoneNumber);
+      } else {
+        // Disabling notifications
+        if (userId) {
+          await updateDoc(doc(db, 'users', userId), {
+            notificationsEnabled: false,
+            updatedAt: Date.now()
+          });
+        }
         setNotificationsEnabled(false);
+        console.log("🔕 SMS alerts disabled");
       }
     } catch (err: any) {
       console.error("Error toggling notifications:", err);
-      setError(err.message || "Failed to update notification settings.");
+      if (err.code === 1) {
+        setError("Location access denied. Please enable location permissions in your browser.");
+      } else {
+        setError(err.message || "Failed to update notification settings.");
+      }
     } finally {
-      setNotifLoading(false);
+      setLoading(false);
     }
   };
 
@@ -651,140 +670,59 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-gray-500 mb-8">Customize app experience & manage account.</p>
+          <p className="text-gray-500 mb-8">Customize app experience & manage SMS alerts.</p>
         </div>
 
-        {/* Account Settings */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-gray-700" />
-            <h2 className="text-lg font-semibold text-gray-900">{t('settings.account')}</h2>
-          </div>
-          
-          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-            {user ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 font-medium">{t('settings.signedin')}</p>
-                    <p className="font-semibold text-gray-900">{user.phoneNumber}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="w-full py-2.5 px-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-gray-200"
-                >
-                  {t('action.signout')}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {!confirmationResult ? (
-                  <>
-                    <p className="text-sm text-gray-600 mb-2">Sign in with your phone number to sync settings and history.</p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Phone Number (E.164 format)</label>
-                        <input 
-                          type="tel" 
-                          placeholder="+1 555-555-5555"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
-                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        />
-                        <p className="text-[10px] text-gray-400 mt-1">Include country code starting with +</p>
-                      </div>
-                      <div id="recaptcha-container"></div>
-                      
-                      {error && (
-                        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          {error}
-                        </p>
-                      )}
-
-                      <button
-                        onClick={onSignInSubmit}
-                        disabled={loading || !phoneNumber}
-                        className={`w-full py-3 px-4 bg-black text-white rounded-xl font-medium transition-all ${
-                          loading || !phoneNumber ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 shadow-md'
-                        }`}
-                      >
-                        {loading ? "Sending Code..." : "Send Verification Code"}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-gray-600">Enter code sent to {phoneNumber}</p>
-                      <button 
-                         onClick={() => {
-                           setConfirmationResult(null); 
-                           setVerificationCode("");
-                           setError(null);
-                         }}
-                         className="text-xs text-blue-600 font-medium hover:underline"
-                      >
-                        Change Number
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                         <input 
-                          type="text" 
-                          placeholder="123456"
-                          value={verificationCode}
-                          onChange={(e) => setVerificationCode(e.target.value)}
-                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all tracking-widest text-center text-lg font-mono"
-                        />
-                      
-                      {error && (
-                        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          {error}
-                        </p>
-                      )}
-
-                      <button
-                        onClick={onVerifyCode}
-                        disabled={loading || !verificationCode}
-                        className={`w-full py-3 px-4 bg-blue-600 text-white rounded-xl font-medium transition-all ${
-                          loading || !verificationCode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 shadow-lg shadow-blue-200'
-                        }`}
-                      >
-                        {loading ? "Verifying..." : "Verify & Sign In"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Proximity Alerts Settings */}
+        {/* SMS Alerts Settings */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-5 h-5 text-gray-700" />
             <h2 className="text-lg font-semibold text-gray-900">{t('settings.notifications')}</h2>
           </div>
           
-          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-            <div className="flex items-center justify-between gap-4">
+          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
+            <p className="text-sm text-gray-600">
+              Get SMS alerts when ICE activity is reported near your location.
+            </p>
+
+            {/* Phone Number Input */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                Phone Number (E.164 format)
+              </label>
+              <input 
+                type="tel" 
+                placeholder="+1 555-555-5555"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={notificationsEnabled}
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Include country code starting with +</p>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                {error}
+              </p>
+            )}
+
+            {/* Enable/Disable Toggle */}
+            <div className="flex items-center justify-between gap-4 pt-2">
               <div className="flex-1">
-                <p className="font-medium text-gray-900">Push Notifications</p>
-                <p className="text-xs text-gray-500 mt-0.5">{t('settings.notifications.desc')}</p>
+                <p className="font-medium text-gray-900">SMS Alerts</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {notificationsEnabled ? 'Enabled' : 'Enable to receive SMS alerts'}
+                </p>
               </div>
               <button
                 onClick={handleToggleNotifications}
-                disabled={notifLoading || !user}
+                disabled={loading || (!notificationsEnabled && !phoneNumber)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                   notificationsEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                } ${(!user || notifLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${(loading || (!notificationsEnabled && !phoneNumber)) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -793,20 +731,14 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
                 />
               </button>
             </div>
-            
-            {!user && (
-              <p className="text-[10px] text-orange-600 mt-3 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Sign in to enable proximity alerts
-              </p>
-            )}
-            
+
             {notificationsEnabled && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
-                <Bell className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <p className="text-[11px] text-blue-800 leading-relaxed">
-                  You will receive a notification if a sighting is reported within 2km of your location. Make sure browser notifications are allowed.
-                </p>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
+                <Bell className="w-4 h-4 text-green-600 mt-0.5" />
+                <div className="text-xs text-green-700">
+                  <p className="font-semibold">Alerts Active</p>
+                  <p className="mt-1">You'll receive SMS alerts for sightings within 2km of your location.</p>
+                </div>
               </div>
             )}
           </div>

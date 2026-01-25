@@ -10,10 +10,13 @@ import { MAPBOX_TOKEN, DEFAULT_MAP_CONFIG, PING_RADIUS_METERS, SEATTLE_METRO_BOU
 // Set Mapbox access token
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+import { Location } from './LocationDropdown';
+
 interface MapViewProps {
   sightings: IceSighting[];
   onMarkerClick: (sighting: IceSighting) => void;
   selectedSighting?: IceSighting | null;
+  viewLocation?: Location | null;
 }
 
 // Map color modes to Hex codes for Mapbox paint properties
@@ -30,7 +33,7 @@ function metersToPixelsAtMaxZoom(meters: number, latitude: number): number {
   return meters / 0.075 / Math.cos((latitude * Math.PI) / 180);
 }
 
-export default function MapView({ sightings, onMarkerClick, selectedSighting }: MapViewProps) {
+export default function MapView({ sightings, onMarkerClick, selectedSighting, viewLocation }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -47,6 +50,18 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting }: 
       });
     }
   }, [selectedSighting]);
+
+  // Fly to specific location (from dropdown)
+  useEffect(() => {
+    if (map.current && viewLocation) {
+      map.current.flyTo({
+        center: viewLocation.coordinates,
+        zoom: viewLocation.zoom || 14,
+        essential: true, // Animation is considered essential with respect to prefers-reduced-motion
+        duration: 2000
+      });
+    }
+  }, [viewLocation]);
 
   // Initialize map
   useEffect(() => {
