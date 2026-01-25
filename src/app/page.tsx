@@ -51,6 +51,8 @@ export default function HomePage() {
             imageUrl: data.imageUrl,
             upvotes: data.upvotes || 0,
             downvotes: data.downvotes || 0,
+            verification: data.verification,
+            updates: data.updates,
           };
 
           // Filter out expired sightings (older than 4 hours)

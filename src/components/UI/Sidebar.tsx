@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { toBlob } from "html-to-image";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff, Share2 } from "lucide-react";
@@ -73,17 +74,13 @@ const SightingDetailView = ({
   const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
 
   const handleVerification = async (isStillThere: boolean) => {
-    console.log(`Attempting verification vote: ${isStillThere ? 'YES' : 'NO'} for sighting ${sighting.id}`);
     try {
-      if (!sighting.id) {
-        console.error("Sighting ID is missing");
-        return;
-      }
+      if (!sighting.id) return;
+      
       const sightingRef = doc(db, 'sightings', sighting.id);
       await updateDoc(sightingRef, {
         [`verification.${isStillThere ? 'stillThere' : 'notThere'}`]: increment(1)
       });
-      console.log("Verification vote successful");
     } catch (error) {
       console.error("Error updating verification:", error);
     }
@@ -93,13 +90,10 @@ const SightingDetailView = ({
     e.preventDefault();
     if (!updateText.trim()) return;
 
-    console.log(`Attempting to add update for sighting ${sighting.id}: ${updateText}`);
     setIsSubmittingUpdate(true);
     try {
-      if (!sighting.id) {
-        console.error("Sighting ID is missing");
-        return;
-      }
+      if (!sighting.id) return;
+
       const sightingRef = doc(db, 'sightings', sighting.id);
       await updateDoc(sightingRef, {
         updates: arrayUnion({
@@ -107,7 +101,6 @@ const SightingDetailView = ({
           timestamp: Date.now()
         })
       });
-      console.log("Update added successfully");
       setUpdateText("");
     } catch (error) {
       console.error("Error adding update:", error);
@@ -377,46 +370,64 @@ const SightingDetailView = ({
           </div>
         </div>
 
-        {/* Updates Section */}
+        {/* Updates Thread Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
              <Bell className="w-5 h-5 text-gray-600" />
-            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Updates</h3>
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Updates Thread</h3>
           </div>
           
-           <div className="space-y-4">
+           <div className="relative pl-4 space-y-6">
+            {/* Thread Line */}
+            <div className="absolute left-0 top-2 bottom-0 w-0.5 bg-gray-200" />
+
             {/* Existing Updates */}
             {sighting.updates && sighting.updates.map((update, index) => (
-              <div key={index} className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                <p className={`text-gray-800 ${textClasses.base}`}>{update.text}</p>
-                <div className="mt-2 flex items-center gap-2 text-blue-600 text-xs font-medium">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatTimeAgo(update.timestamp)}</span>
+              <div key={index} className="relative pl-6">
+                {/* Thread Dot */}
+                <div className="absolute left-[-5px] top-2 w-3 h-3 rounded-full bg-blue-500 border-2 border-white ring-1 ring-gray-100" />
+                
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative">
+                  {/* Speech Bubble Arrow */}
+                  <div className="absolute left-[-6px] top-3 w-3 h-3 bg-white border-l border-b border-gray-200 transform rotate-45" />
+                  
+                  <p className={`text-gray-800 ${textClasses.base} relative z-10`}>{update.text}</p>
+                  <div className="mt-2 flex items-center justify-end gap-2 text-blue-600 text-xs font-medium">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatTimeAgo(update.timestamp)}</span>
+                  </div>
                 </div>
               </div>
             ))}
 
-            {/* Add Update Form */}
-            <form onSubmit={handleAddUpdate} className="bg-gray-50 rounded-2xl p-5">
-              <label className={`block text-gray-700 font-medium mb-2 ${textClasses.sm}`}>
-                Add more description
-              </label>
-              <textarea
-                value={updateText}
-                onChange={(e) => setUpdateText(e.target.value)}
-                placeholder="Details about movement, specific location, or changes..."
-                className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-base mb-3 resize-none"
-                rows={3}
-              />
-              <button
-                type="submit"
-                disabled={!updateText.trim() || isSubmittingUpdate}
-                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-              >
-                {isSubmittingUpdate ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
-                Add Update
-              </button>
-            </form>
+            {/* Add Update Form (Thread style) */}
+            <div className="relative pl-6">
+               {/* Thread Dot for New Entry */}
+               <div className="absolute left-[-5px] top-5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white ring-1 ring-gray-100" />
+
+              <form onSubmit={handleAddUpdate} className="bg-gray-50 rounded-2xl p-4 border border-dashed border-gray-300">
+                <label className={`block text-gray-600 font-medium mb-2 ${textClasses.sm}`}>
+                  Add to thread...
+                </label>
+                <textarea
+                  value={updateText}
+                  onChange={(e) => setUpdateText(e.target.value)}
+                  placeholder="Share a new development..."
+                  className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-base mb-3 resize-none shadow-sm"
+                  rows={2}
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={!updateText.trim() || isSubmittingUpdate}
+                    className="bg-blue-600 text-white font-bold py-2 px-6 rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                  >
+                    {isSubmittingUpdate ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                    Post
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -961,11 +972,13 @@ const Sidebar = ({
         <div className="flex items-center justify-center relative">
           <div className="flex items-center gap-4">
              {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-               src="/lightThemeBanner.webp" 
-               alt="Melt the ICE" 
-               className="h-12 w-auto object-contain" 
-            />
+            <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
+              <img 
+                 src="/lightThemeBanner.webp" 
+                 alt="Melt the ICE" 
+                 className="h-12 w-auto object-contain" 
+              />
+            </Link>
           </div>
           <button 
             onClick={toggleSidebar} 
