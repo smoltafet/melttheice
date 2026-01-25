@@ -2,26 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import twilio from 'twilio';
 
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Only initialize Twilio if credentials are present
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
-// Initialize Firebase Admin (only if credentials are present)
-if (!admin.apps.length && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-  try {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+// Helper function to initialize Firebase Admin only when needed
+function getFirebaseAdmin() {
+  if (!admin.apps.length) {
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return null;
+    }
     
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to initialize Firebase Admin:', error);
+    try {
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+      
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to initialize Firebase Admin:', error);
+      return null;
+    }
   }
+  
+  return admin.apps.length > 0 ? admin : null;
 }
 
 /**
@@ -41,8 +50,10 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 
 export async function POST(req: NextRequest) {
   try {
-    // Check if Firebase Admin is properly initialized
-    if (!admin.apps.length) {
+    // Initialize Firebase Admin if needed
+    const firebaseAdmin = getFirebaseAdmin();
+    
+    if (!firebaseAdmin) {
       console.error('Firebase Admin not initialized - missing credentials');
       return NextResponse.json({ 
         error: 'Server configuration error. Alerts are disabled.' 
@@ -59,8 +70,8 @@ export async function POST(req: NextRequest) {
     const alertRadius = 2; // 2km radius
 
     // Get Firebase services
-    const db = admin.firestore();
-    const messaging = admin.messaging();
+    const db = firebaseAdmin.firestore();
+    const messaging = firebaseAdmin.messaging();
 
     // 1. Fetch all users with notifications enabled
     const usersSnapshot = await db.collection('users')
@@ -80,8 +91,20 @@ export async function POST(req: NextRequest) {
       const distance = calculateDistance(lat, lng, userLocation.lat, userLocation.lng);
 
       if (distance <= alertRadius) {
-        // Prepare notification payload
-        const messageBody = `WARNING: ICE Sighting reported near you! (${sighting.vehicle.color} ${sighting.vehicle.type}). See details at melttheice.us`;
+        // Get user's language preference (default to English)
+        const userLang = userData.language || 'en';
+        
+        // Prepare localized notification messages
+        const alertTitle = userLang === 'es' ? '⚠️ ALERTA DE ICE' : '⚠️ ICE ALERT';
+        const alertWarning = userLang === 'es' 
+          ? 'ADVERTENCIA: ¡Avistamiento de ICE reportado cerca de ti!' 
+          : 'WARNING: ICE Sighting reported near you!';
+        const vehicleInfo = `${sighting.vehicle.color} ${sighting.vehicle.type}`;
+        const detailsLink = userLang === 'es' 
+          ? 'Ver detalles en melttheice.us' 
+          : 'See details at melttheice.us';
+        
+        const messageBody = `${alertWarning} (${vehicleInfo}). ${detailsLink}`;
 
         // 2a. Send Push Notification (FCM)
         if (userData.fcmToken) {
@@ -89,7 +112,7 @@ export async function POST(req: NextRequest) {
             messaging.send({
               token: userData.fcmToken,
               notification: {
-                title: '⚠️ ICE ALERT',
+                title: alertTitle,
                 body: messageBody,
               },
               webpush: {
@@ -102,7 +125,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2b. Send SMS (Twilio) - if preference set or just send both for now
-        if (userData.phoneNumber) {
+        if (userData.phoneNumber && twilioClient) {
           notifications.push(
             twilioClient.messages.create({
               body: messageBody,

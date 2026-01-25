@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, HelpCircle, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff } from "lucide-react";
+import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff } from "lucide-react";
 import { IceSighting } from "@/lib/types";
 import { doc, updateDoc, increment, getDoc, setDoc } from "firebase/firestore";
 import { db, auth, messaging } from "@/lib/firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, User, ConfirmationResult } from "firebase/auth";
 import { useSettings, ColorMode, TextSize } from "@/lib/settings-context";
 import { getCurrentLocation } from "@/lib/utils";
+import { useLanguage } from "@/lib/language-context";
 
 declare global {
   interface Window {
@@ -62,13 +63,14 @@ const SightingDetailView = ({
   onBack: () => void;
 }) => {
   const { getUrgencyColors, textSize } = useSettings();
+  const { t } = useLanguage();
   const urgency = getUrgencyLevel(sighting.timestamp);
   const colors = getUrgencyColors(urgency);
 
   const urgencyLabels = {
-    high: "ACTIVE THREAT",
-    medium: "RECENT SIGHTING",
-    low: "OLDER REPORT",
+    high: t('urgency.high'),
+    medium: t('urgency.medium'),
+    low: t('urgency.low'),
   };
 
   // Dynamic text classes based on settings
@@ -93,7 +95,7 @@ const SightingDetailView = ({
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors group"
         >
           <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-          <span className="font-medium">All Sightings</span>
+          <span className="font-medium">{t('sidebar.all')}</span>
         </button>
       </div>
 
@@ -122,12 +124,12 @@ const SightingDetailView = ({
                <div className="w-5 h-5 text-gray-600 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                </div>
-              <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Photo Evidence</h3>
+              <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>{t('detail.photo')}</h3>
             </div>
             <div className="rounded-2xl border border-gray-200 shadow-sm relative bg-gray-50 flex justify-center p-2">
               <img 
                 src={sighting.imageUrl} 
-                alt="Sighting evidence" 
+                alt={t('detail.evidence')} 
                 className="max-h-40 w-auto h-auto rounded-lg object-contain"
                 loading="lazy"
               />
@@ -139,7 +141,7 @@ const SightingDetailView = ({
         <div className="mb-8">
           <div className={`flex items-center gap-2 text-gray-500 ${textClasses.sm} mb-1`}>
             <Clock className="w-4 h-4" />
-            <span>Reported {formatTimeAgo(sighting.timestamp)}</span>
+            <span>{t('detail.reported')} {formatTimeAgo(sighting.timestamp)}</span>
           </div>
           <p className={`text-gray-700 ${textClasses.sm} ml-6`}>{formatFullTime(sighting.timestamp)}</p>
         </div>
@@ -148,16 +150,16 @@ const SightingDetailView = ({
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Car className="w-5 h-5 text-gray-600" />
-            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Vehicle</h3>
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>{t('sighting.vehicle')}</h3>
           </div>
           <div className="bg-gray-50 rounded-2xl p-5 space-y-4">
             <div className="flex justify-between items-center">
-              <span className={`text-gray-500 ${textClasses.base}`}>Type</span>
+              <span className={`text-gray-500 ${textClasses.base}`}>{t('detail.type')}</span>
               <span className={`font-semibold text-gray-900 ${textClasses.base}`}>{sighting.vehicle.type}</span>
             </div>
             <div className="border-t border-gray-200" />
             <div className="flex justify-between items-center">
-              <span className={`text-gray-500 ${textClasses.base}`}>Color</span>
+              <span className={`text-gray-500 ${textClasses.base}`}>{t('detail.color')}</span>
               <div className="flex items-center gap-2">
                 <span className={`font-semibold text-gray-900 ${textClasses.base}`}>{sighting.vehicle.color || "Unknown"}</span>
               </div>
@@ -169,18 +171,18 @@ const SightingDetailView = ({
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-gray-600" />
-            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Personnel</h3>
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>{t('sighting.personnel')}</h3>
           </div>
           <div className="bg-gray-50 rounded-2xl p-5 space-y-4">
             <div className="flex justify-between items-center">
-              <span className={`text-gray-500 ${textClasses.base}`}>Count</span>
+              <span className={`text-gray-500 ${textClasses.base}`}>{t('detail.count')}</span>
               <span className={`font-semibold text-gray-900 ${textClasses.base}`}>{sighting.personnel.count} {sighting.personnel.count === 1 ? 'person' : 'people'}</span>
             </div>
             {sighting.personnel.description && (
               <>
                 <div className="border-t border-gray-200" />
                 <div>
-                  <span className={`text-gray-500 block mb-2 ${textClasses.base}`}>Description</span>
+                  <span className={`text-gray-500 block mb-2 ${textClasses.base}`}>{t('detail.description')}</span>
                   <p className={`text-gray-900 ${textClasses.base}`}>{sighting.personnel.description}</p>
                 </div>
               </>
@@ -192,11 +194,11 @@ const SightingDetailView = ({
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-gray-600" />
-            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Activity</h3>
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>{t('sighting.activity')}</h3>
           </div>
           <div className="bg-gray-50 rounded-2xl p-5 space-y-4">
             <div className="flex justify-between items-center">
-              <span className={`text-gray-500 ${textClasses.base}`}>Status</span>
+              <span className={`text-gray-500 ${textClasses.base}`}>{t('detail.status')}</span>
               <span className={`px-3 py-1 rounded-full font-medium ${textClasses.sm} ${
                 sighting.behavior.activity === 'Patrolling' ? 'bg-blue-100 text-blue-700' :
                 sighting.behavior.activity === 'Processing' ? 'bg-purple-100 text-purple-700' :
@@ -222,11 +224,11 @@ const SightingDetailView = ({
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Navigation className="w-5 h-5 text-gray-600" />
-            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>Location</h3>
+            <h3 className={`${textClasses.sm} font-semibold text-gray-700 uppercase tracking-wider`}>{t('sighting.location')}</h3>
           </div>
           <div className="bg-gray-50 rounded-2xl p-5">
             <div className="flex items-center justify-between">
-              <span className={`text-gray-500 ${textClasses.base}`}>Coordinates</span>
+              <span className={`text-gray-500 ${textClasses.base}`}>{t('detail.coordinates')}</span>
               <span className={`font-mono text-gray-900 ${textClasses.sm}`}>
                 {sighting.location.lat.toFixed(5)}, {sighting.location.lng.toFixed(5)}
               </span>
@@ -347,6 +349,7 @@ const SightingCard = ({
 // Settings View Component
 const SettingsView = ({ onBack }: { onBack: () => void }) => {
   const { colorMode, setColorMode, textSize, setTextSize } = useSettings();
+  const { t } = useLanguage();
   
   // Auth State
   const [user, setUser] = useState<User | null>(null);
@@ -655,7 +658,7 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-gray-700" />
-            <h2 className="text-lg font-semibold text-gray-900">Account</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('settings.account')}</h2>
           </div>
           
           <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
@@ -666,7 +669,7 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 font-medium">Signed in as</p>
+                    <p className="text-sm text-gray-500 font-medium">{t('settings.signedin')}</p>
                     <p className="font-semibold text-gray-900">{user.phoneNumber}</p>
                   </div>
                 </div>
@@ -674,7 +677,7 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
                   onClick={handleSignOut}
                   className="w-full py-2.5 px-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-gray-200"
                 >
-                  Sign Out
+                  {t('action.signout')}
                 </button>
               </div>
             ) : (
@@ -767,14 +770,14 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-5 h-5 text-gray-700" />
-            <h2 className="text-lg font-semibold text-gray-900">Real-time Alerts</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('settings.notifications')}</h2>
           </div>
           
           <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
                 <p className="font-medium text-gray-900">Push Notifications</p>
-                <p className="text-xs text-gray-500 mt-0.5">Receive alerts when sightings are reported near you.</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t('settings.notifications.desc')}</p>
               </div>
               <button
                 onClick={handleToggleNotifications}
@@ -892,23 +895,30 @@ const SettingsView = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-const SidebarGlobalFooter = ({ onSettingsClick }: { onSettingsClick: () => void }) => (
-  <div className="px-4 py-3 border-t border-gray-200 bg-white">
-    <div className="space-y-1">
-      <button className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium">
-        <HelpCircle className="w-7 h-7" />
-        Help
-      </button>
-      <button 
-        onClick={onSettingsClick}
-        className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium"
-      >
-        <Settings className="w-7 h-7" />
-        Settings
-      </button>
+const SidebarGlobalFooter = ({ onSettingsClick }: { onSettingsClick: () => void }) => {
+  const { language, setLanguage, t } = useLanguage();
+  
+  return (
+    <div className="px-4 py-3 border-t border-gray-200 bg-white">
+      <div className="space-y-1">
+        <button 
+          onClick={() => setLanguage(language === 'en' ? 'es' : 'en')}
+          className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium"
+        >
+          <Globe className="w-7 h-7" />
+          {language === 'en' ? 'English' : 'Español'}
+        </button>
+        <button 
+          onClick={onSettingsClick}
+          className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium"
+        >
+          <Settings className="w-7 h-7" />
+          {t('sidebar.settings')}
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const AnimatedMenuToggle = ({
   toggle,
@@ -949,6 +959,7 @@ const Sidebar = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [internalSelectedSighting, setInternalSelectedSighting] = useState<IceSighting | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const { t } = useLanguage();
 
   // Use prop if provided, otherwise internal state
   const selectedSighting = propSelectedSighting !== undefined ? propSelectedSighting : internalSelectedSighting;
@@ -1037,7 +1048,7 @@ const Sidebar = ({
       <div className="flex-1 px-6 py-6 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-semibold text-gray-700 uppercase tracking-wide">
-            Recent Sightings
+            {t('sidebar.recent')}
           </h2>
           <span className="text-sm text-gray-500">Last 4 hours</span>
         </div>
@@ -1047,7 +1058,7 @@ const Sidebar = ({
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <MapPin className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500 font-medium">No recent sightings</p>
+            <p className="text-gray-500 font-medium">{t('msg.nosightings')}</p>
             <p className="text-sm text-gray-400 mt-1">Sightings will appear here when reported</p>
           </div>
         ) : (
