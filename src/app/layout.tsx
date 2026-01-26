@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   description: "Real-time ICE activity tracker for the Seattle Metro area. Privacy-focused community reporting.",
 };
 
+import { Analytics } from "@vercel/analytics/next"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,6 +37,7 @@ export default function RootLayout({
             {children}
           </SettingsProvider>
         </LanguageProvider>
+        <Analytics />
       </body>
     </html>
   );

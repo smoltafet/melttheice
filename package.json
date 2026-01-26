@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@vercel/analytics": "^1.6.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.8.0",
     "firebase-admin": "^13.6.0",

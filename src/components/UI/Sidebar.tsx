@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { toBlob } from "html-to-image";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff, Share2 } from "lucide-react";
+import { AlertTriangle, Clock, MapPin, Car, Users, X, Menu, ChevronLeft, ChevronRight, ArrowLeft, Activity, Navigation, Settings, Globe, ChevronUp, ChevronDown, Eye, Type, Bell, BellOff, Share2, MessageSquare } from "lucide-react";
 import { IceSighting } from "@/lib/types";
 import { doc, updateDoc, increment, getDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { db, auth, messaging } from "@/lib/firebase";
@@ -851,6 +851,13 @@ const SidebarGlobalFooter = ({ onSettingsClick }: { onSettingsClick: () => void 
           <Globe className="w-7 h-7" />
           {language === 'en' ? 'English' : 'Español'}
         </button>
+        <Link 
+          href="/recommendation"
+          className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium"
+        >
+          <MessageSquare className="w-7 h-7" />
+          Recommendation
+        </Link>
         <button 
           onClick={onSettingsClick}
           className="w-full flex items-center gap-4 px-5 py-5 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors text-lg font-medium"
