@@ -31,6 +31,11 @@ const translations = {
     'sidebar.settings': 'Settings',
     'sidebar.details': 'Sighting Details',
     'sidebar.nodata': 'No recent sightings in the past 4 hours',
+    'sidebar.sort': 'Sort sightings',
+    'sidebar.sort.trusted': 'Top rated',
+    'sidebar.sort.newest': 'Newest',
+    'sidebar.sort.nearest': 'Nearest',
+    'sidebar.sort.locationerror': 'Location unavailable — showing newest first',
     
     // Urgency Levels
     'urgency.high': 'ACTIVE THREAT',
@@ -151,6 +156,11 @@ const translations = {
     'sidebar.settings': 'Configuración',
     'sidebar.details': 'Detalles del Avistamiento',
     'sidebar.nodata': 'No hay avistamientos recientes en las últimas 4 horas',
+    'sidebar.sort': 'Ordenar avistamientos',
+    'sidebar.sort.trusted': 'Mejor valorados',
+    'sidebar.sort.newest': 'Más recientes',
+    'sidebar.sort.nearest': 'Más cercanos',
+    'sidebar.sort.locationerror': 'Ubicación no disponible — mostrando los más recientes primero',
     
     // Urgency Levels
     'urgency.high': 'AMENAZA ACTIVA',

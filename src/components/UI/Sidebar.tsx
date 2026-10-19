@@ -11,6 +11,12 @@ import { db, auth, messaging } from "@/lib/firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, User, ConfirmationResult } from "firebase/auth";
 import { useSettings, ColorMode, TextSize } from "@/lib/settings-context";
 import { getCurrentLocation } from "@/lib/utils";
+import {
+  GeoPoint,
+  distanceById,
+  formatDistance,
+  sortSightingsByDistance,
+} from "@/lib/geo";
 import { useLanguage } from "@/lib/language-context";
 
 declare global {
@@ -446,10 +452,12 @@ const SightingCard = ({
   sighting,
   onClick,
   onVote,
+  distanceKm,
 }: {
   sighting: IceSighting;
   onClick: () => void;
   onVote: (e: React.MouseEvent, direction: 'up' | 'down') => void;
+  distanceKm?: number;
 }) => {
   const { getUrgencyColors, textSize } = useSettings();
   const urgency = getUrgencyLevel(sighting.timestamp);
@@ -531,6 +539,16 @@ const SightingCard = ({
                 {sighting.behavior.activity}
               </span>
             </div>
+
+            {/* Distance from the viewer (only in "Nearest" sort mode) */}
+            {distanceKm !== undefined && (
+              <div className="flex items-center gap-2 mt-2">
+                <Navigation className="w-4 h-4 text-gray-500" />
+                <span className={`${textClasses.sm} text-gray-600`}>
+                  {formatDistance(distanceKm)} away
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Chevron indicator */}
@@ -890,6 +908,8 @@ const AnimatedMenuToggle = ({
   </button>
 );
 
+type SightingSortMode = 'trusted' | 'newest' | 'nearest';
+
 interface SidebarProps {
   children?: React.ReactNode;
   sightings?: IceSighting[];
@@ -961,16 +981,50 @@ const Sidebar = ({
     }
   };
 
-  // Sort sightings by trust score (upvotes - downvotes), then by timestamp
-  const sortedSightings = [...sightings].sort((a, b) => {
-    const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
-    const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
-    
-    if (scoreA !== scoreB) {
-      return scoreB - scoreA; // High score first
+  const [sortMode, setSortMode] = useState<SightingSortMode>('trusted');
+  const [userOrigin, setUserOrigin] = useState<GeoPoint | null>(null);
+  const [locationError, setLocationError] = useState(false);
+
+  // Switching to "nearest" needs the viewer's position. Ask for it once;
+  // if geolocation fails, fall back to "newest" and say so in the UI.
+  const handleSortModeChange = (mode: SightingSortMode) => {
+    setSortMode(mode);
+    if (mode !== 'nearest' || userOrigin) {
+      return;
     }
-    return b.timestamp - a.timestamp; // Newest first as tiebreaker
-  });
+    getCurrentLocation()
+      .then((location) => {
+        setUserOrigin(location);
+        setLocationError(false);
+      })
+      .catch((error) => {
+        console.error('Error getting location for nearest sort:', error);
+        setLocationError(true);
+      });
+  };
+
+  const nearestActive = sortMode === 'nearest' && userOrigin !== null;
+
+  // Sort sightings by the selected mode:
+  // - trusted: trust score (upvotes - downvotes), newest first on ties
+  // - newest: timestamp, newest first
+  // - nearest: distance from the viewer, newest first on ties
+  const sortedSightings = nearestActive
+    ? sortSightingsByDistance(sightings, userOrigin)
+    : [...sightings].sort((a, b) => {
+        if (sortMode === 'trusted') {
+          const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
+          const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
+
+          if (scoreA !== scoreB) {
+            return scoreB - scoreA; // High score first
+          }
+        }
+        return b.timestamp - a.timestamp; // Newest first
+      });
+
+  // Distances shown on cards while "nearest" is active
+  const distances = nearestActive ? distanceById(sightings, userOrigin) : null;
 
   const SightingsList = () => (
     <div className="flex flex-col h-full">
@@ -1005,6 +1059,40 @@ const Sidebar = ({
           <span className="text-sm text-gray-500">Last 4 hours</span>
         </div>
 
+        {/* Sort mode toggle */}
+        <div
+          className="flex items-center gap-1 mb-6 bg-gray-100 rounded-full p-1"
+          role="group"
+          aria-label={t('sidebar.sort')}
+        >
+          {(
+            [
+              { mode: 'trusted', labelKey: 'sidebar.sort.trusted' },
+              { mode: 'newest', labelKey: 'sidebar.sort.newest' },
+              { mode: 'nearest', labelKey: 'sidebar.sort.nearest' },
+            ] as { mode: SightingSortMode; labelKey: string }[]
+          ).map(({ mode, labelKey }) => (
+            <button
+              key={mode}
+              onClick={() => handleSortModeChange(mode)}
+              aria-pressed={sortMode === mode}
+              className={`flex-1 py-1.5 px-3 rounded-full text-sm font-medium transition-colors ${
+                sortMode === mode
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+
+        {sortMode === 'nearest' && locationError && (
+          <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-6">
+            {t('sidebar.sort.locationerror')}
+          </p>
+        )}
+
         {sortedSightings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -1021,6 +1109,7 @@ const Sidebar = ({
                 sighting={sighting}
                 onClick={() => handleSightingClick(sighting)}
                 onVote={(e, dir) => handleVote(e, sighting.id, dir)}
+                distanceKm={distances?.get(sighting.id)}
               />
             ))}
           </div>
@@ -1129,7 +1218,7 @@ const Sidebar = ({
         <div className="absolute top-4 left-4 z-[999] md:hidden">
           <AnimatedMenuToggle toggle={toggleSidebar} isOpen={isOpen} />
         </div>
-        
+
         {/* Map / Content Container */}
         <div className="h-full w-full">
           {children}
