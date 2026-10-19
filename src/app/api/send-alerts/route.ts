@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import twilio from 'twilio';
+import { calculateDistance, resolveUserAlertLocation } from '@/lib/geo';
 
 // Only initialize Twilio if credentials are present
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -46,21 +47,6 @@ function getFirebaseAdmin() {
   return admin.apps.length > 0 ? admin : null;
 }
 
-/**
- * Calculate distance between two points in km
- */
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Initialize Firebase Admin if needed
@@ -96,18 +82,22 @@ export async function POST(req: NextRequest) {
     const notifications: Promise<any>[] = [];
     let smsAttempts = 0;
     let fcmAttempts = 0;
+    let usersInRange = 0;
 
     usersSnapshot.forEach((userDoc: any) => {
       const userData = userDoc.data();
-      const userLocation = userData.lastKnownLocation;
 
-      // If we don't know where the user is, we skip them for now 
-      // (or we could store their "Home Zone")
+      // The settings UI stores the position under `location`; older
+      // documents may still carry it under `lastKnownLocation`.
+      const userLocation = resolveUserAlertLocation(userData);
+
+      // If we don't know where the user is, we skip them for now
       if (!userLocation) return;
 
       const distance = calculateDistance(lat, lng, userLocation.lat, userLocation.lng);
 
       if (distance <= alertRadius) {
+        usersInRange++;
         // Get user's language preference (default to English)
         const userLang = userData.language || 'en';
         
@@ -191,7 +181,7 @@ export async function POST(req: NextRequest) {
       totalNotifications: notifications.length,
       fcmAttempts,
       smsAttempts,
-      usersInRange: usersSnapshot.size
+      usersInRange
     });
 
     return NextResponse.json({ 
