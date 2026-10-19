@@ -36,6 +36,7 @@ const translations = {
     'sidebar.sort.newest': 'Newest',
     'sidebar.sort.nearest': 'Nearest',
     'sidebar.sort.locationerror': 'Location unavailable — showing newest first',
+    'sidebar.similarreports': 'similar reports grouped',
     
     // Urgency Levels
     'urgency.high': 'ACTIVE THREAT',
@@ -161,6 +162,7 @@ const translations = {
     'sidebar.sort.newest': 'Más recientes',
     'sidebar.sort.nearest': 'Más cercanos',
     'sidebar.sort.locationerror': 'Ubicación no disponible — mostrando los más recientes primero',
+    'sidebar.similarreports': 'informes similares agrupados',
     
     // Urgency Levels
     'urgency.high': 'AMENAZA ACTIVA',
