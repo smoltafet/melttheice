@@ -18,6 +18,7 @@ import {
   sortSightingsByDistance,
 } from "@/lib/geo";
 import { useLanguage } from "@/lib/language-context";
+import { clusterSightings } from "@/lib/clusters";
 
 declare global {
   interface Window {
@@ -453,13 +454,16 @@ const SightingCard = ({
   onClick,
   onVote,
   distanceKm,
+  duplicateCount,
 }: {
   sighting: IceSighting;
   onClick: () => void;
   onVote: (e: React.MouseEvent, direction: 'up' | 'down') => void;
   distanceKm?: number;
+  duplicateCount?: number;
 }) => {
   const { getUrgencyColors, textSize } = useSettings();
+  const { t } = useLanguage();
   const urgency = getUrgencyLevel(sighting.timestamp);
   const colors = getUrgencyColors(urgency);
   
@@ -546,6 +550,16 @@ const SightingCard = ({
                 <Navigation className="w-4 h-4 text-gray-500" />
                 <span className={`${textClasses.sm} text-gray-600`}>
                   {formatDistance(distanceKm)} away
+                </span>
+              </div>
+            )}
+
+            {/* Other reports grouped into this one as duplicates */}
+            {duplicateCount !== undefined && duplicateCount > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <Users className="w-4 h-4 text-gray-500" />
+                <span className={`${textClasses.sm} text-gray-600`}>
+                  +{duplicateCount} {t('sidebar.similarreports')}
                 </span>
               </div>
             )}
@@ -1005,13 +1019,25 @@ const Sidebar = ({
 
   const nearestActive = sortMode === 'nearest' && userOrigin !== null;
 
+  // Group duplicate reports of the same event (same vehicle type,
+  // close in place and time) so the list shows one card per event.
+  // The card is the cluster's representative — most trusted, then
+  // newest — and carries a "+N similar reports grouped" badge.
+  const clusters = clusterSightings(sightings);
+  const representatives = clusters.map((cluster) => cluster.representative);
+  const duplicateCounts = new Map<string, number>(
+    clusters
+      .filter((cluster) => cluster.reportCount > 1)
+      .map((cluster) => [cluster.representative.id, cluster.reportCount - 1])
+  );
+
   // Sort sightings by the selected mode:
   // - trusted: trust score (upvotes - downvotes), newest first on ties
   // - newest: timestamp, newest first
   // - nearest: distance from the viewer, newest first on ties
   const sortedSightings = nearestActive
-    ? sortSightingsByDistance(sightings, userOrigin)
-    : [...sightings].sort((a, b) => {
+    ? sortSightingsByDistance(representatives, userOrigin)
+    : [...representatives].sort((a, b) => {
         if (sortMode === 'trusted') {
           const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
           const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
@@ -1024,7 +1050,7 @@ const Sidebar = ({
       });
 
   // Distances shown on cards while "nearest" is active
-  const distances = nearestActive ? distanceById(sightings, userOrigin) : null;
+  const distances = nearestActive ? distanceById(representatives, userOrigin) : null;
 
   const SightingsList = () => (
     <div className="flex flex-col h-full">
@@ -1110,6 +1136,7 @@ const Sidebar = ({
                 onClick={() => handleSightingClick(sighting)}
                 onVote={(e, dir) => handleVote(e, sighting.id, dir)}
                 distanceKm={distances?.get(sighting.id)}
+                duplicateCount={duplicateCounts.get(sighting.id)}
               />
             ))}
           </div>
