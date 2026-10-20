@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { IceSighting } from '@/lib/types';
 import { calculateOpacity, hexToRgba } from '@/lib/utils';
+import { buildMapFeatures, toGeoJsonFeatures } from '@/lib/mapFeatures';
 import { useSettings, ColorMode } from '@/lib/settings-context';
 import { MAPBOX_TOKEN, DEFAULT_MAP_CONFIG, PING_RADIUS_METERS, SEATTLE_METRO_BOUNDS } from '@/lib/mapbox';
 
@@ -186,30 +187,18 @@ export default function MapView({ sightings, onMarkerClick, selectedSighting, vi
 
       if (!radiusSource || !centersSource) return;
 
+      // One feature per event, not per report: duplicate reports of
+      // the same sighting are clustered (matching the sidebar), and
+      // the radius fades by the cluster's newest report.
+      const mapFeatures = buildMapFeatures(sightings);
+
       // Create GeoJSON features for radius circles
-      const radiusFeatures = sightings.map((sighting) => ({
-        type: 'Feature' as const,
-        properties: {
-          id: sighting.id,
-          opacity: calculateOpacity(sighting.timestamp),
-        },
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [sighting.location.lng, sighting.location.lat],
-        },
+      const radiusFeatures = toGeoJsonFeatures(mapFeatures, (feature) => ({
+        opacity: calculateOpacity(feature.latestTimestamp),
       }));
 
       // Create GeoJSON features for center dots
-      const centerFeatures = sightings.map((sighting) => ({
-        type: 'Feature' as const,
-        properties: {
-          id: sighting.id,
-        },
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [sighting.location.lng, sighting.location.lat],
-        },
-      }));
+      const centerFeatures = toGeoJsonFeatures(mapFeatures);
 
       radiusSource.setData({
         type: 'FeatureCollection',
