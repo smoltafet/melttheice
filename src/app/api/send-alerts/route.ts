@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import twilio from 'twilio';
-import { calculateDistance, resolveUserAlertLocation } from '@/lib/geo';
+import {
+  buildAlertMessage,
+  isAlertableSighting,
+  parseAlertSighting,
+  planAlerts,
+} from '@/lib/alerts';
 
 // Only initialize Twilio if credentials are present
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -27,10 +32,10 @@ function getFirebaseAdmin() {
     if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
       return null;
     }
-    
+
     try {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      
+
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -43,7 +48,7 @@ function getFirebaseAdmin() {
       return null;
     }
   }
-  
+
   return admin.apps.length > 0 ? admin : null;
 }
 
@@ -51,22 +56,27 @@ export async function POST(req: NextRequest) {
   try {
     // Initialize Firebase Admin if needed
     const firebaseAdmin = getFirebaseAdmin();
-    
+
     if (!firebaseAdmin) {
       console.error('Firebase Admin not initialized - missing credentials');
-      return NextResponse.json({ 
-        error: 'Server configuration error. Alerts are disabled.' 
+      return NextResponse.json({
+        error: 'Server configuration error. Alerts are disabled.'
       }, { status: 503 });
     }
 
-    const { sighting } = await req.json();
-
-    if (!sighting || !sighting.location) {
+    // Validate the payload up front: a malformed sighting is a 400,
+    // never a 500 raised halfway through the recipient loop.
+    const sighting = parseAlertSighting(await req.json());
+    if (!sighting) {
       return NextResponse.json({ error: 'Invalid sighting data' }, { status: 400 });
     }
 
-    const { lat, lng } = sighting.location;
-    const alertRadius = 2; // 2km radius
+    // A retried or replayed report of an old sighting must not
+    // re-alert everyone nearby.
+    if (!isAlertableSighting(sighting)) {
+      console.log('⏭️ Sighting is stale or future-dated; skipping alerts');
+      return NextResponse.json({ success: true, alertedCount: 0, skipped: 'stale-sighting' });
+    }
 
     // Get Firebase services
     const db = firebaseAdmin.firestore();
@@ -79,101 +89,71 @@ export async function POST(req: NextRequest) {
 
     console.log(`📊 Found ${usersSnapshot.size} user(s) with notifications enabled`);
 
+    // 2. Plan recipients purely (radius, channels, language) — the
+    // decision logic lives in @/lib/alerts and is unit tested there.
+    const users = usersSnapshot.docs.map((userDoc: any) => ({
+      id: userDoc.id,
+      data: userDoc.data() as Record<string, unknown>,
+    }));
+    const recipients = planAlerts(users, sighting);
+
+    // 3. Perform the sends for the plan.
     const notifications: Promise<any>[] = [];
     let smsAttempts = 0;
     let fcmAttempts = 0;
-    let usersInRange = 0;
 
-    usersSnapshot.forEach((userDoc: any) => {
-      const userData = userDoc.data();
+    for (const recipient of recipients) {
+      const message = buildAlertMessage(sighting, recipient.language);
 
-      // The settings UI stores the position under `location`; older
-      // documents may still carry it under `lastKnownLocation`.
-      const userLocation = resolveUserAlertLocation(userData);
+      // 3a. Send Push Notification (FCM)
+      if (recipient.fcmToken) {
+        fcmAttempts++;
+        console.log(`📲 Sending FCM to user ${recipient.userId}`);
+        notifications.push(
+          messaging.send({
+            token: recipient.fcmToken,
+            notification: {
+              title: message.title,
+              body: message.body,
+            },
+            webpush: {
+              fcmOptions: {
+                link: 'https://melttheice.us',
+              },
+            },
+          }).then(() => {
+            console.log(`✅ FCM sent successfully to user ${recipient.userId}`);
+          }).catch((err: any) => {
+            console.error(`❌ FCM error for ${recipient.userId}:`, err.message);
+          })
+        );
+      }
 
-      // If we don't know where the user is, we skip them for now
-      if (!userLocation) return;
-
-      const distance = calculateDistance(lat, lng, userLocation.lat, userLocation.lng);
-
-      if (distance <= alertRadius) {
-        usersInRange++;
-        // Get user's language preference (default to English)
-        const userLang = userData.language || 'en';
-        
-        // Prepare localized notification messages
-        const alertTitle = userLang === 'es' ? '⚠️ ALERTA DE ICE' : '⚠️ ICE ALERT';
-        const alertWarning = userLang === 'es' 
-          ? 'ADVERTENCIA: ¡Avistamiento de ICE reportado cerca de ti!' 
-          : 'WARNING: ICE Sighting reported near you!';
-        const vehicleInfo = `${sighting.vehicle.color} ${sighting.vehicle.type}`;
-        const detailsLink = userLang === 'es' 
-          ? 'Ver detalles en melttheice.us' 
-          : 'See details at melttheice.us';
-        
-        const messageBody = `${alertWarning} (${vehicleInfo}). ${detailsLink}`;
-
-        // 2a. Send Push Notification (FCM)
-        if (userData.fcmToken) {
-          fcmAttempts++;
-          console.log(`📲 Sending FCM to user ${userDoc.id}`);
+      // 3b. Send SMS (Twilio)
+      if (recipient.phoneNumber) {
+        if (twilioClient) {
+          smsAttempts++;
+          console.log(`📱 Attempting SMS to ${recipient.phoneNumber} (user ${recipient.userId})`);
           notifications.push(
-            messaging.send({
-              token: userData.fcmToken,
-              notification: {
-                title: alertTitle,
-                body: messageBody,
-              },
-              webpush: {
-                fcmOptions: {
-                  link: 'https://melttheice.us',
-                },
-              },
-            }).then(() => {
-              console.log(`✅ FCM sent successfully to user ${userDoc.id}`);
+            twilioClient.messages.create({
+              body: message.body,
+              from: process.env.TWILIO_PHONE_NUMBER,
+              to: recipient.phoneNumber,
+            }).then((message: any) => {
+              console.log(`✅ SMS sent successfully to ${recipient.phoneNumber}, SID: ${message.sid}`);
             }).catch((err: any) => {
-              console.error(`❌ FCM error for ${userDoc.id}:`, err.message);
+              console.error(`❌ SMS error for ${recipient.phoneNumber} (user ${recipient.userId}):`, {
+                code: err.code,
+                message: err.message,
+                status: err.status
+              });
             })
           );
-        }
-
-        // 2b. Send SMS (Twilio) - if preference set or just send both for now
-        if (userData.phoneNumber && twilioClient) {
-          // Validate phone number format (E.164)
-          const phoneNumber = userData.phoneNumber;
-          const isValidFormat = /^\+[1-9]\d{1,14}$/.test(phoneNumber);
-          
-          if (!isValidFormat) {
-            console.warn(`⚠️ Invalid phone number format for user ${userDoc.id}: ${phoneNumber}`);
-          } else {
-            smsAttempts++;
-            console.log(`📱 Attempting SMS to ${phoneNumber} (user ${userDoc.id})`);
-            notifications.push(
-              twilioClient.messages.create({
-                body: messageBody,
-                from: process.env.TWILIO_PHONE_NUMBER,
-                to: phoneNumber,
-              }).then((message: any) => {
-                console.log(`✅ SMS sent successfully to ${phoneNumber}, SID: ${message.sid}`);
-              }).catch((err: any) => {
-                console.error(`❌ SMS error for ${phoneNumber} (user ${userDoc.id}):`, {
-                  code: err.code,
-                  message: err.message,
-                  status: err.status
-                });
-              })
-            );
-          }
         } else {
-          if (!userData.phoneNumber) {
-            console.log(`ℹ️ User ${userDoc.id} has no phone number stored`);
-          }
-          if (!twilioClient) {
-            console.warn(`⚠️ Twilio client not available for user ${userDoc.id}`);
-          }
+          console.warn(`⚠️ Twilio client not available for user ${recipient.userId}`);
         }
       }
-    });
+    }
 
     await Promise.all(notifications);
 
@@ -181,14 +161,14 @@ export async function POST(req: NextRequest) {
       totalNotifications: notifications.length,
       fcmAttempts,
       smsAttempts,
-      usersInRange
+      usersInRange: recipients.length
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       alertedCount: notifications.length,
       fcmAttempts,
-      smsAttempts 
+      smsAttempts
     });
   } catch (error: any) {
     console.error('Alert processing error:', error);
