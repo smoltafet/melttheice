@@ -140,10 +140,11 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          sighting: { 
+          sighting: {
             location: data.location,
-            vehicle: { type: data.vehicleType, color: data.vehicleColor }
-          } 
+            vehicle: { type: data.vehicleType, color: data.vehicleColor },
+            timestamp: Date.now()
+          }
         }),
       })
         .then(async (response) => {
