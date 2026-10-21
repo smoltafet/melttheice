@@ -20,6 +20,7 @@ import {
 import { useLanguage } from "@/lib/language-context";
 import { clusterSightings } from "@/lib/clusters";
 import { sortSightingsByFreshness } from "@/lib/freshness";
+import { summarizeSightings } from "@/lib/sightingStats";
 
 declare global {
   interface Window {
@@ -1032,6 +1033,11 @@ const Sidebar = ({
       .map((cluster) => [cluster.representative.id, cluster.reportCount - 1])
   );
 
+  // Aggregate digest for the summary strip above the list: how many
+  // reports fall in the current 4-hour window and how the community's
+  // confirmations break down over the same period.
+  const statsSummary = summarizeSightings(sightings);
+
   // Sort sightings by the selected mode:
   // - trusted: trust score (upvotes - downvotes), newest first on ties
   // - newest: timestamp, newest first
@@ -1123,6 +1129,15 @@ const Sidebar = ({
           </p>
         )}
 
+        {statsSummary.inWindow > 0 && (
+          <p className="text-sm text-gray-500 mb-6">
+            {statsSummary.inWindow} {t('sidebar.summary.reports')}
+            {' · '}
+            {statsSummary.verification.stillThere} {t('sidebar.summary.stillthere')}
+            {statsSummary.verification.contested > 0 && (
+              <>
+                {' · '}
+                {statsSummary.verification.contested} {t('sidebar.summary.contested')}
               </>
             )}
           </p>
