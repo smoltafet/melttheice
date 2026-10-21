@@ -35,6 +35,7 @@ const translations = {
     'sidebar.sort.trusted': 'Top rated',
     'sidebar.sort.newest': 'Newest',
     'sidebar.sort.nearest': 'Nearest',
+    'sidebar.sort.fresh': 'Freshest',
     'sidebar.sort.locationerror': 'Location unavailable — showing newest first',
     'sidebar.similarreports': 'similar reports grouped',
     
@@ -161,6 +162,7 @@ const translations = {
     'sidebar.sort.trusted': 'Mejor valorados',
     'sidebar.sort.newest': 'Más recientes',
     'sidebar.sort.nearest': 'Más cercanos',
+    'sidebar.sort.fresh': 'Más actuales',
     'sidebar.sort.locationerror': 'Ubicación no disponible — mostrando los más recientes primero',
     'sidebar.similarreports': 'informes similares agrupados',
     

@@ -19,6 +19,7 @@ import {
 } from "@/lib/geo";
 import { useLanguage } from "@/lib/language-context";
 import { clusterSightings } from "@/lib/clusters";
+import { sortSightingsByFreshness } from "@/lib/freshness";
 
 declare global {
   interface Window {
@@ -922,7 +923,7 @@ const AnimatedMenuToggle = ({
   </button>
 );
 
-type SightingSortMode = 'trusted' | 'newest' | 'nearest';
+type SightingSortMode = 'trusted' | 'newest' | 'nearest' | 'fresh';
 
 interface SidebarProps {
   children?: React.ReactNode;
@@ -1037,6 +1038,8 @@ const Sidebar = ({
   // - nearest: distance from the viewer, newest first on ties
   const sortedSightings = nearestActive
     ? sortSightingsByDistance(representatives, userOrigin)
+    : sortMode === 'fresh'
+    ? sortSightingsByFreshness(representatives)
     : [...representatives].sort((a, b) => {
         if (sortMode === 'trusted') {
           const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
@@ -1096,6 +1099,7 @@ const Sidebar = ({
               { mode: 'trusted', labelKey: 'sidebar.sort.trusted' },
               { mode: 'newest', labelKey: 'sidebar.sort.newest' },
               { mode: 'nearest', labelKey: 'sidebar.sort.nearest' },
+              { mode: 'fresh', labelKey: 'sidebar.sort.fresh' },
             ] as { mode: SightingSortMode; labelKey: string }[]
           ).map(({ mode, labelKey }) => (
             <button
@@ -1116,6 +1120,11 @@ const Sidebar = ({
         {sortMode === 'nearest' && locationError && (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-6">
             {t('sidebar.sort.locationerror')}
+          </p>
+        )}
+
+              </>
+            )}
           </p>
         )}
 
