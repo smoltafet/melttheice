@@ -36,6 +36,9 @@ const translations = {
     'sidebar.sort.newest': 'Newest',
     'sidebar.sort.nearest': 'Nearest',
     'sidebar.sort.fresh': 'Freshest',
+    'sidebar.summary.reports': 'reports in the last 4 hours',
+    'sidebar.summary.stillthere': 'still-there confirmations',
+    'sidebar.summary.contested': 'contested',
     'sidebar.sort.locationerror': 'Location unavailable — showing newest first',
     'sidebar.similarreports': 'similar reports grouped',
     
@@ -163,6 +166,9 @@ const translations = {
     'sidebar.sort.newest': 'Más recientes',
     'sidebar.sort.nearest': 'Más cercanos',
     'sidebar.sort.fresh': 'Más actuales',
+    'sidebar.summary.reports': 'informes en las últimas 4 horas',
+    'sidebar.summary.stillthere': 'confirmaciones de que siguen ahí',
+    'sidebar.summary.contested': 'en disputa',
     'sidebar.sort.locationerror': 'Ubicación no disponible — mostrando los más recientes primero',
     'sidebar.similarreports': 'informes similares agrupados',
     
