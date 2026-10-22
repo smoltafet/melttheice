@@ -22,6 +22,7 @@ import { clusterSightings } from "@/lib/clusters";
 import { sortSightingsByFreshness } from "@/lib/freshness";
 import { summarizeSightings } from "@/lib/sightingStats";
 import { filterSightings } from "@/lib/filtering";
+import { nearbyDigest } from "@/lib/nearby";
 
 declare global {
   interface Window {
@@ -1067,6 +1068,10 @@ const Sidebar = ({
   // Distances shown on cards while "nearest" is active
   const distances = nearestActive ? distanceById(visibleRepresentatives, userOrigin) : null;
 
+  // "What's near me" digest shown while "nearest" is active: closest
+  // report with its compass direction, and how many fall within 5 km.
+  const nearby = nearestActive ? nearbyDigest(visibleRepresentatives, userOrigin) : null;
+
   const SightingsList = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -1149,6 +1154,15 @@ const Sidebar = ({
         {sortMode === 'nearest' && locationError && (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-6">
             {t('sidebar.sort.locationerror')}
+          </p>
+        )}
+
+        {nearby?.nearest && (
+          <p className="text-sm text-gray-500 mb-6">
+            {t('sidebar.nearby.closest')}: {formatDistance(nearby.nearest.distanceKm)}{' '}
+            {nearby.nearest.compass}
+            {' · '}
+            {nearby.rings.within1Km + nearby.rings.within5Km} {t('sidebar.nearby.within5km')}
           </p>
         )}
 
