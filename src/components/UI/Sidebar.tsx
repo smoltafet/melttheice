@@ -21,6 +21,7 @@ import { useLanguage } from "@/lib/language-context";
 import { clusterSightings } from "@/lib/clusters";
 import { sortSightingsByFreshness } from "@/lib/freshness";
 import { summarizeSightings } from "@/lib/sightingStats";
+import { filterSightings } from "@/lib/filtering";
 
 declare global {
   interface Window {
@@ -998,6 +999,7 @@ const Sidebar = ({
   };
 
   const [sortMode, setSortMode] = useState<SightingSortMode>('trusted');
+  const [searchQuery, setSearchQuery] = useState('');
   const [userOrigin, setUserOrigin] = useState<GeoPoint | null>(null);
   const [locationError, setLocationError] = useState(false);
 
@@ -1038,15 +1040,19 @@ const Sidebar = ({
   // confirmations break down over the same period.
   const statsSummary = summarizeSightings(sightings);
 
+  // Free-text search over the representatives: one card per event,
+  // filtered by everything written on the report (see lib/filtering).
+  const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
+
   // Sort sightings by the selected mode:
   // - trusted: trust score (upvotes - downvotes), newest first on ties
   // - newest: timestamp, newest first
   // - nearest: distance from the viewer, newest first on ties
   const sortedSightings = nearestActive
-    ? sortSightingsByDistance(representatives, userOrigin)
+    ? sortSightingsByDistance(visibleRepresentatives, userOrigin)
     : sortMode === 'fresh'
-    ? sortSightingsByFreshness(representatives)
-    : [...representatives].sort((a, b) => {
+    ? sortSightingsByFreshness(visibleRepresentatives)
+    : [...visibleRepresentatives].sort((a, b) => {
         if (sortMode === 'trusted') {
           const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
           const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
@@ -1059,7 +1065,7 @@ const Sidebar = ({
       });
 
   // Distances shown on cards while "nearest" is active
-  const distances = nearestActive ? distanceById(representatives, userOrigin) : null;
+  const distances = nearestActive ? distanceById(visibleRepresentatives, userOrigin) : null;
 
   const SightingsList = () => (
     <div className="flex flex-col h-full">
@@ -1092,6 +1098,23 @@ const Sidebar = ({
             {t('sidebar.recent')}
           </h2>
           <span className="text-sm text-gray-500">Last 4 hours</span>
+        </div>
+
+        {/* Search box: filters the list by report text */}
+        <div className="mb-4">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('sidebar.search.placeholder')}
+            aria-label={t('sidebar.search.placeholder')}
+            className="w-full px-4 py-2 text-sm bg-gray-100 rounded-full outline-none focus:ring-2 focus:ring-gray-300 placeholder:text-gray-400"
+          />
+          {searchQuery.trim() !== '' && (
+            <p className="text-xs text-gray-400 mt-2 px-1">
+              {sortedSightings.length} {t('sidebar.search.results')}
+            </p>
+          )}
         </div>
 
         {/* Sort mode toggle */}
@@ -1149,7 +1172,11 @@ const Sidebar = ({
               <MapPin className="w-8 h-8 text-gray-400" />
             </div>
             <p className="text-gray-500 font-medium">{t('msg.nosightings')}</p>
-            <p className="text-sm text-gray-400 mt-1">Sightings will appear here when reported</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {searchQuery.trim() !== ''
+                ? t('sidebar.search.noresults')
+                : 'Sightings will appear here when reported'}
+            </p>
           </div>
         ) : (
           <div>
