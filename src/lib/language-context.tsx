@@ -44,6 +44,8 @@ const translations = {
     'sidebar.summary.reports': 'reports in the last 4 hours',
     'sidebar.summary.stillthere': 'still-there confirmations',
     'sidebar.summary.contested': 'contested',
+    'sidebar.export.csv': 'Export CSV',
+    'sidebar.export.json': 'Export JSON',
     'sidebar.sort.locationerror': 'Location unavailable — showing newest first',
     'sidebar.similarreports': 'similar reports grouped',
     
@@ -179,6 +181,8 @@ const translations = {
     'sidebar.summary.reports': 'informes en las últimas 4 horas',
     'sidebar.summary.stillthere': 'confirmaciones de que siguen ahí',
     'sidebar.summary.contested': 'en disputa',
+    'sidebar.export.csv': 'Exportar CSV',
+    'sidebar.export.json': 'Exportar JSON',
     'sidebar.sort.locationerror': 'Ubicación no disponible — mostrando los más recientes primero',
     'sidebar.similarreports': 'informes similares agrupados',
     

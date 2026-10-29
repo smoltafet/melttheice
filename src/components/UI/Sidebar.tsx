@@ -23,6 +23,7 @@ import { sortSightingsByFreshness } from "@/lib/freshness";
 import { summarizeSightings } from "@/lib/sightingStats";
 import { filterSightings } from "@/lib/filtering";
 import { nearbyDigest } from "@/lib/nearby";
+import { exportFilename, sightingsToCsv, sightingsToJson, type ExportFormat } from "@/lib/export";
 
 declare global {
   interface Window {
@@ -1072,6 +1073,19 @@ const Sidebar = ({
   // report with its compass direction, and how many fall within 5 km.
   const nearby = nearestActive ? nearbyDigest(visibleRepresentatives, userOrigin) : null;
 
+  // Download the currently visible (searched + sorted) reports as a
+  // CSV or JSON file, via lib/export.
+  const downloadExport = (format: ExportFormat) => {
+    const content = format === 'csv' ? sightingsToCsv(sortedSightings) : sightingsToJson(sortedSightings);
+    const blob = new Blob([content], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = exportFilename(format);
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const SightingsList = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -1178,6 +1192,23 @@ const Sidebar = ({
               </>
             )}
           </p>
+        )}
+
+        {sortedSightings.length > 0 && (
+          <div className="flex items-center gap-2 mb-6">
+            <button
+              onClick={() => downloadExport('csv')}
+              className="py-1.5 px-3 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              {t('sidebar.export.csv')}
+            </button>
+            <button
+              onClick={() => downloadExport('json')}
+              className="py-1.5 px-3 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              {t('sidebar.export.json')}
+            </button>
+          </div>
         )}
 
         {sortedSightings.length === 0 ? (
