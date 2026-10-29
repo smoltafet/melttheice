@@ -5,6 +5,7 @@ import { collection, addDoc, onSnapshot, query, orderBy, Timestamp, doc, setDoc 
 import { db } from '@/lib/firebase';
 import { IceSighting, ReportFormData } from '@/lib/types';
 import { isExpired } from '@/lib/utils';
+import { parseSightingDocument } from '@/lib/validation';
 import { Sidebar } from '@/components/UI/Sidebar';
 import MapView from '@/components/Map/MapView';
 import ReportButton from '@/components/Report/ReportButton';
@@ -40,20 +41,14 @@ export default function HomePage() {
         const allSightings: IceSighting[] = [];
 
         snapshot.forEach((doc) => {
-          const data = doc.data();
-          const sighting: IceSighting = {
-            id: doc.id,
-            timestamp: data.timestamp,
-            location: data.location,
-            vehicle: data.vehicle,
-            personnel: data.personnel,
-            behavior: data.behavior,
-            imageUrl: data.imageUrl,
-            upvotes: data.upvotes || 0,
-            downvotes: data.downvotes || 0,
-            verification: data.verification,
-            updates: data.updates,
-          };
+          // Reject documents whose core fields are missing or out of
+          // range instead of casting them blindly; downstream code
+          // (distance, clustering, freshness) assumes they are valid.
+          const sighting = parseSightingDocument(doc.id, doc.data());
+          if (!sighting) {
+            console.warn('Skipping malformed sighting document:', doc.id);
+            return;
+          }
 
           // Filter out expired sightings (older than 4 hours)
           if (!isExpired(sighting.timestamp)) {
