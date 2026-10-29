@@ -24,6 +24,7 @@ import { summarizeSightings } from "@/lib/sightingStats";
 import { filterSightings } from "@/lib/filtering";
 import { nearbyDigest } from "@/lib/nearby";
 import { exportFilename, sightingsToCsv, sightingsToJson, type ExportFormat } from "@/lib/export";
+import { bucketSightingsByTime, busiestBucket } from "@/lib/timeline";
 
 declare global {
   interface Window {
@@ -1042,6 +1043,10 @@ const Sidebar = ({
   // confirmations break down over the same period.
   const statsSummary = summarizeSightings(sightings);
 
+  // Busiest clock hour across the loaded reports, from the hourly
+  // activity timeline (see lib/timeline), shown in the summary strip.
+  const peakBucket = busiestBucket(bucketSightingsByTime(sightings));
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1189,6 +1194,13 @@ const Sidebar = ({
               <>
                 {' · '}
                 {statsSummary.verification.contested} {t('sidebar.summary.contested')}
+              </>
+            )}
+            {peakBucket && (
+              <>
+                {' · '}
+                {t('sidebar.summary.busiest')}:{' '}
+                {new Date(peakBucket.start).toLocaleTimeString([], { hour: 'numeric' })} ({peakBucket.count})
               </>
             )}
           </p>
