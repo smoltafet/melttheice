@@ -25,6 +25,7 @@ import { filterSightings } from "@/lib/filtering";
 import { nearbyDigest } from "@/lib/nearby";
 import { exportFilename, sightingsToCsv, sightingsToJson, type ExportFormat } from "@/lib/export";
 import { bucketSightingsByTime, busiestBucket } from "@/lib/timeline";
+import { compareActivityTrend } from "@/lib/trend";
 
 declare global {
   interface Window {
@@ -1047,6 +1048,10 @@ const Sidebar = ({
   // activity timeline (see lib/timeline), shown in the summary strip.
   const peakBucket = busiestBucket(bucketSightingsByTime(sightings));
 
+  // Whether report volume is rising or falling versus the previous
+  // 4-hour window (see lib/trend), shown in the summary strip.
+  const trend = compareActivityTrend(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1201,6 +1206,19 @@ const Sidebar = ({
                 {' · '}
                 {t('sidebar.summary.busiest')}:{' '}
                 {new Date(peakBucket.start).toLocaleTimeString([], { hour: 'numeric' })} ({peakBucket.count})
+              </>
+            )}
+            {trend.direction !== 'none' && (
+              <>
+                {' · '}
+                {t('sidebar.summary.trend')}: {t(`sidebar.summary.trend.${trend.direction}`)}
+                {trend.percentChange !== null && (
+                  <>
+                    {' '}
+                    ({trend.delta > 0 ? '+' : ''}
+                    {trend.percentChange}%)
+                  </>
+                )}
               </>
             )}
           </p>
