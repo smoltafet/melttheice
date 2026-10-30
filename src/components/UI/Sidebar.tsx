@@ -27,6 +27,7 @@ import { exportFilename, sightingsToCsv, sightingsToJson, type ExportFormat } fr
 import { bucketSightingsByTime, busiestBucket } from "@/lib/timeline";
 import { compareActivityTrend } from "@/lib/trend";
 import { summarizeSightingUpdates } from "@/lib/updates";
+import { summarizePersonnel } from "@/lib/personnel";
 
 declare global {
   interface Window {
@@ -1057,6 +1058,10 @@ const Sidebar = ({
   // lib/updates), shown in the summary strip.
   const updatesSummary = summarizeSightingUpdates(sightings);
 
+  // Personnel reported in the current 4-hour window (see
+  // lib/personnel), shown in the summary strip.
+  const personnelSummary = summarizePersonnel(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1230,6 +1235,12 @@ const Sidebar = ({
               <>
                 {' · '}
                 {updatesSummary.inWindow} {t('sidebar.summary.updates')}
+              </>
+            )}
+            {personnelSummary.inWindow > 0 && (
+              <>
+                {' · '}
+                {personnelSummary.inWindow} {t('sidebar.summary.personnel')}
               </>
             )}
           </p>
