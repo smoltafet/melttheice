@@ -26,6 +26,7 @@ import { nearbyDigest } from "@/lib/nearby";
 import { exportFilename, sightingsToCsv, sightingsToJson, type ExportFormat } from "@/lib/export";
 import { bucketSightingsByTime, busiestBucket } from "@/lib/timeline";
 import { compareActivityTrend } from "@/lib/trend";
+import { summarizeSightingUpdates } from "@/lib/updates";
 
 declare global {
   interface Window {
@@ -1052,6 +1053,10 @@ const Sidebar = ({
   // 4-hour window (see lib/trend), shown in the summary strip.
   const trend = compareActivityTrend(sightings);
 
+  // Follow-up updates posted in the current 4-hour window (see
+  // lib/updates), shown in the summary strip.
+  const updatesSummary = summarizeSightingUpdates(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1219,6 +1224,12 @@ const Sidebar = ({
                     {trend.percentChange}%)
                   </>
                 )}
+              </>
+            )}
+            {updatesSummary.inWindow > 0 && (
+              <>
+                {' · '}
+                {updatesSummary.inWindow} {t('sidebar.summary.updates')}
               </>
             )}
           </p>
