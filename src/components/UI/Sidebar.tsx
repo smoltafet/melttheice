@@ -28,6 +28,7 @@ import { bucketSightingsByTime, busiestBucket } from "@/lib/timeline";
 import { compareActivityTrend } from "@/lib/trend";
 import { summarizeSightingUpdates } from "@/lib/updates";
 import { summarizePersonnel } from "@/lib/personnel";
+import { summarizeCoverage } from "@/lib/coverage";
 
 declare global {
   interface Window {
@@ -1062,6 +1063,10 @@ const Sidebar = ({
   // lib/personnel), shown in the summary strip.
   const personnelSummary = summarizePersonnel(sightings);
 
+  // Geographic footprint of the loaded reports (see lib/coverage):
+  // how many distinct areas they cover, shown in the summary strip.
+  const coverageSummary = summarizeCoverage(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1241,6 +1246,12 @@ const Sidebar = ({
               <>
                 {' · '}
                 {personnelSummary.inWindow} {t('sidebar.summary.personnel')}
+              </>
+            )}
+            {coverageSummary.distinctAreas > 1 && (
+              <>
+                {' · '}
+                {coverageSummary.distinctAreas} {t('sidebar.summary.areas')}
               </>
             )}
           </p>
