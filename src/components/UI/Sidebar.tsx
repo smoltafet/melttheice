@@ -29,6 +29,7 @@ import { compareActivityTrend } from "@/lib/trend";
 import { summarizeSightingUpdates } from "@/lib/updates";
 import { summarizePersonnel } from "@/lib/personnel";
 import { summarizeCoverage } from "@/lib/coverage";
+import { summarizeCompleteness } from "@/lib/completeness";
 
 declare global {
   interface Window {
@@ -1067,6 +1068,10 @@ const Sidebar = ({
   // how many distinct areas they cover, shown in the summary strip.
   const coverageSummary = summarizeCoverage(sightings);
 
+  // How many loaded reports carry full details (see
+  // lib/completeness), shown in the summary strip.
+  const completenessSummary = summarizeCompleteness(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1252,6 +1257,12 @@ const Sidebar = ({
               <>
                 {' · '}
                 {coverageSummary.distinctAreas} {t('sidebar.summary.areas')}
+              </>
+            )}
+            {completenessSummary.completeCount > 0 && (
+              <>
+                {' · '}
+                {completenessSummary.completeCount} {t('sidebar.summary.complete')}
               </>
             )}
           </p>
