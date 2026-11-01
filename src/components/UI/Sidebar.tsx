@@ -30,6 +30,7 @@ import { summarizeSightingUpdates } from "@/lib/updates";
 import { summarizePersonnel } from "@/lib/personnel";
 import { summarizeCoverage } from "@/lib/coverage";
 import { summarizeCompleteness } from "@/lib/completeness";
+import { summarizeConsensus } from "@/lib/consensus";
 
 declare global {
   interface Window {
@@ -1072,6 +1073,11 @@ const Sidebar = ({
   // lib/completeness), shown in the summary strip.
   const completenessSummary = summarizeCompleteness(sightings);
 
+  // How many loaded reports the community's votes settle as
+  // confirmed by consensus (see lib/consensus), shown in the
+  // summary strip.
+  const consensusSummary = summarizeConsensus(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1263,6 +1269,12 @@ const Sidebar = ({
               <>
                 {' · '}
                 {completenessSummary.completeCount} {t('sidebar.summary.complete')}
+              </>
+            )}
+            {consensusSummary.counts.confirmed > 0 && (
+              <>
+                {' · '}
+                {consensusSummary.counts.confirmed} {t('sidebar.summary.consensus')}
               </>
             )}
           </p>
