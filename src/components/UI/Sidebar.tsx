@@ -31,6 +31,7 @@ import { summarizePersonnel } from "@/lib/personnel";
 import { summarizeCoverage } from "@/lib/coverage";
 import { summarizeCompleteness } from "@/lib/completeness";
 import { summarizeConsensus } from "@/lib/consensus";
+import { sortSightingsByPriority, summarizePriority } from "@/lib/priority";
 
 declare global {
   interface Window {
@@ -934,7 +935,7 @@ const AnimatedMenuToggle = ({
   </button>
 );
 
-type SightingSortMode = 'trusted' | 'newest' | 'nearest' | 'fresh';
+type SightingSortMode = 'trusted' | 'newest' | 'nearest' | 'fresh' | 'priority';
 
 interface SidebarProps {
   children?: React.ReactNode;
@@ -1078,6 +1079,10 @@ const Sidebar = ({
   // summary strip.
   const consensusSummary = summarizeConsensus(sightings);
 
+  // How many loaded reports need attention now (see lib/priority),
+  // shown in the summary strip.
+  const prioritySummary = summarizePriority(sightings);
+
   // Free-text search over the representatives: one card per event,
   // filtered by everything written on the report (see lib/filtering).
   const visibleRepresentatives = filterSightings(representatives, { query: searchQuery });
@@ -1090,6 +1095,8 @@ const Sidebar = ({
     ? sortSightingsByDistance(visibleRepresentatives, userOrigin)
     : sortMode === 'fresh'
     ? sortSightingsByFreshness(visibleRepresentatives)
+    : sortMode === 'priority'
+    ? sortSightingsByPriority(visibleRepresentatives)
     : [...visibleRepresentatives].sort((a, b) => {
         if (sortMode === 'trusted') {
           const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
@@ -1184,6 +1191,7 @@ const Sidebar = ({
               { mode: 'newest', labelKey: 'sidebar.sort.newest' },
               { mode: 'nearest', labelKey: 'sidebar.sort.nearest' },
               { mode: 'fresh', labelKey: 'sidebar.sort.fresh' },
+              { mode: 'priority', labelKey: 'sidebar.sort.priority' },
             ] as { mode: SightingSortMode; labelKey: string }[]
           ).map(({ mode, labelKey }) => (
             <button
@@ -1275,6 +1283,12 @@ const Sidebar = ({
               <>
                 {' · '}
                 {consensusSummary.counts.confirmed} {t('sidebar.summary.consensus')}
+              </>
+            )}
+            {prioritySummary.counts.urgent > 0 && (
+              <>
+                {' · '}
+                {prioritySummary.counts.urgent} {t('sidebar.summary.urgent')}
               </>
             )}
           </p>
